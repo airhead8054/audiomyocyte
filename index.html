@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audiomyocyte v2.5</title>
+<style>
+  /* The page background shows the cell's state (the cell file picks the colour).
+     It flashes white when this phone fires. The small dot shows the sync state. */
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 17px;
+    background: #000;
+    color: #eee;
+  }
+  body.flash { background: #fff !important; } /* !important: beats the colour set by the cell */
+  h1 { font-size: 22px; margin: 0 0 12px 0; }
+  button { font-size: 18px; padding: 12px 16px; margin: 4px 0; border-radius: 10px;
+           border: 1px solid #888; background: #222; color: #fff; width: 100%; }
+  button:disabled { opacity: 0.4; }
+  .card { background: rgba(0, 0, 0, 0.65); border-radius: 10px; padding: 10px 12px; margin: 10px 0; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 0; }
+  .row input { width: 120px; font-size: 17px; padding: 4px; }
+  .hint { font-size: 14px; color: #bbb; }
+  #dot { display: inline-block; width: 14px; height: 14px; border-radius: 7px; background: #555;
+         margin-right: 8px; vertical-align: middle; }
+  #status { white-space: pre-wrap; }
+  input[type=range] { width: 100%; }
+  #log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap;
+         max-height: 180px; overflow-y: auto; }
+  /* Expert mode: the "what did I hear" box. It flashes cyan when chirps are heard. */
+  #detectBox { text-align: center; border: 3px solid #444; transition: border-color 0.1s; }
+  #detectBox.heard { border-color: #00e5ff; background: rgba(0, 90, 110, 0.8); }
+  #detectCount { font-size: 56px; font-weight: bold; line-height: 1.1; }
+  #detectDots { font-size: 28px; letter-spacing: 4px; color: #00e5ff; min-height: 34px; }
+  #detectHistory, #detectInfo, #loudResult { font-family: ui-monospace, Menlo, Consolas, monospace;
+         font-size: 13px; white-space: pre-wrap; }
+  button.on { background: #0a5a2a; border-color: #2ecc40; }
+  select { font-size: 17px; padding: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Audiomyocyte v2.5</h1>
+
+<div class="card">
+  <button id="studentBtn">Start as a cell (student)</button>
+  <button id="instructorBtn">Start as the instructor clock</button>
+  <details>
+    <summary>Settings</summary>
+    <div class="row">Period (ms) <input id="periodMs" type="number" value="1000"></div>
+    <div class="row">Student chirp (ms) <input id="chirpMs" type="number" value="10"></div>
+    <div class="row">Instructor chirp (ms) <input id="instructorChirpMs" type="number" value="20"></div>
+    <div class="row">Chirp volume (0–1) <input id="gain" type="number" value="0.8" step="0.1"></div>
+    <div class="row">Neighbour radius (m) <input id="radiusM" type="number" value="1" step="0.25"></div>
+    <div class="row">Detection threshold (0–1) <input id="threshold" type="number" value="0.4" step="0.05"></div>
+    <div class="hint">The threshold is for finding the instructor, sync and own chirps.
+      Neighbour counting uses its own settings (MIN_SNR and others in part 4).</div>
+    <div class="row">Farthest seat from instructor (m) <input id="maxRoomM" type="number" value="20"></div>
+    <div class="row">Cell file <input id="cell" type="text" value="cells/basic.js"></div>
+    <div class="row">Small group / expert mode <input id="expert" type="checkbox" style="width:auto"></div>
+    <div class="hint">Expert mode: no instructor needed, live tuning controls, loudness test
+      and a big "chirps heard" display. Also turned on by ?expert=1 in the address.</div>
+    <div class="hint">Settings can also go in the address, e.g.
+      index.html?periodMs=1200&amp;cell=cells/pacemaker.js</div>
+  </details>
+</div>
+
+<div class="card">
+  <span id="dot"></span><span id="status">Not started</span>
+</div>
+
+<div class="card" id="syncCard" hidden>
+  <button id="syncHereBtn">Sync here (phone right next to the instructor speaker)</button>
+  <button id="seatedBtn">I'm seated</button>
+  <button id="neighbourBtn">Sync with neighbour</button>
+  <div class="hint">Instead of the last button you can hold your phone together with a synced
+    neighbour's phone and shake both.</div>
+</div>
+
+<!-- ===== EXPERT MODE (part 13 of the script) ===== -->
+<div class="card" id="detectBox" hidden>
+  <div class="hint">Neighbour chirps heard on the last tick</div>
+  <div id="detectCount">–</div>
+  <div id="detectDots"></div>
+  <div id="detectInfo"></div>
+  <div id="detectHistory"></div>
+</div>
+
+<div class="card" id="expertCard" hidden>
+  <b>Small group / expert mode</b>
+  <div class="row">Clock
+    <select id="clockSelect">
+      <option value="own">Own clock (no instructor)</option>
+      <option value="instructor">Follow instructor chirps</option>
+    </select>
+  </div>
+  <button id="referenceBtn">Be the reference clock</button>
+  <button id="getTimeBtn">Get the time from a nearby phone</button>
+  <button id="beaconBtn">Send the time (beacon): off</button>
+  <button id="actInstructorBtn">Also play instructor chirps: off</button>
+  <button id="forgetBtn">Forget sync</button>
+  <div class="hint">To sync: one phone taps "Be the reference clock" and turns its beacon on.
+    Hold another phone a few cm from it and tap "Get the time from a nearby phone"
+    (or shake both). Synced phones can beacon too, so the group doubles each round.</div>
+
+  <h4>Loudness test (two synced phones a few cm apart)</h4>
+  <div class="row">
+    <button id="loudABtn" style="width:32%">I'm A</button>
+    <button id="loudBBtn" style="width:32%">I'm B</button>
+    <button id="loudStopBtn" style="width:32%">Stop</button>
+  </div>
+  <div class="hint">A chirps on the tick, B three quarters of a period later. Each phone
+    measures both chirps, so you see how loud the partner is compared with itself.</div>
+  <div id="loudResult"></div>
+
+  <h4>Tuning (changes take effect on the next tick)</h4>
+  <div>Detection threshold (instructor, sync, own chirps): <b id="thresholdVal"></b></div>
+  <input id="thresholdSlider" type="range" min="0.1" max="0.9" step="0.05">
+  <div>Neighbour SNR needed (MIN_SNR): <b id="minSnrVal"></b></div>
+  <input id="minSnrSlider" type="range" min="2" max="30" step="1">
+  <div>Chirp volume: <b id="gainVal"></b></div>
+  <input id="gainSlider" type="range" min="0" max="1" step="0.05">
+  <div class="row">Listening window (neighbour radius)
+    <select id="radiusSelect">
+      <option value="0.5">0.5 m</option>
+      <option value="1">1 m</option>
+      <option value="2">2 m</option>
+      <option value="3">3 m</option>
+      <option value="5">5 m</option>
+    </select>
+  </div>
+  <div class="row">Student chirp length
+    <select id="chirpSelect">
+      <option value="5">5 ms</option>
+      <option value="10">10 ms</option>
+      <option value="20">20 ms</option>
+      <option value="40">40 ms</option>
+    </select>
+  </div>
+  <div class="hint">All phones in the group must use the same chirp length.</div>
+</div>
+
+<div class="card" id="cellCard" hidden>
+  <div><b id="cellName"></b></div>
+  <button id="runBtn">Run simulation</button>
+  <button id="resetCellBtn" hidden>Reset cell (start from resting)</button>
+  <div id="cellControls"></div>
+</div>
+
+<h3>Log</h3>
+<div id="log"></div>
+
+<script>
+// =====================================================================
+//  AUDIOMYOCYTE v2.5
+// =====================================================================
+//  Each phone is a heart-muscle cell. Phones chirp only on a shared tick,
+//  and a cell fires after hearing enough neighbours. The cell's rules live in
+//  a separate file (cells/basic.js) so they can be changed without touching
+//  this program.
+//
+//  What is new compared with v2:
+//    - The INSTRUCTOR CHIRP is the clock. v2 converted between the audio
+//      clock and the page clock with getOutputTimestamp(), which turned out
+//      to be very unreliable on iPhones. Here everything is measured in audio
+//      frames, and every instructor chirp re-sets the timing.
+//    - No time server. A phone gets the true time by being held next to the
+//      instructor speaker ("Sync here"), carried to its seat ("I'm seated"),
+//      and then passing the time on to neighbours by shaking phones together.
+//    - The audio-thread file (chirp_worklet.js) is much simpler: it only
+//      plays and records at frames the page asks for.
+//    - A cell that fires does not listen on that tick (it is refractory), so
+//      the phone never has to tell its own chirp from a neighbour's.
+//
+//  Parts of this file (search for the numbers):
+//    1. Settings
+//    2. Small helpers
+//    3. Chirp shapes
+//    4. Chirp search
+//    5. Starting audio, and talking to chirp_worklet.js
+//    6. Our own speaker -> microphone delay ("loopback")
+//    7. Instructor mode
+//    8. Following the instructor chirp
+//    9. Getting synced: at the speaker, carrying, seated
+//   10. Shake sync with a neighbour
+//   11. The simulation and the cell file
+//   12. Screen and buttons
+//   13. Small group / expert mode (new in v2.6)
+//
+//  EXPERT MODE (v2.6), for about 10 students who know what they are doing.
+//  Turn it on in Settings or with ?expert=1. It adds:
+//    - "Own clock": the phone keeps time with its own frame counter and needs
+//      no instructor. One phone becomes the reference; others get the time by
+//      being held a few cm from a phone that sends "beacon" sync chirps.
+//    - Any synced phone can also play instructor chirps, so a phone can act
+//      as the instructor for phones that choose "Follow instructor chirps".
+//    - A loudness test for two phones held close together.
+//    - Live tuning: thresholds, volume, listening window, chirp length.
+//    - A big display of how many neighbour chirps were heard on each tick.
+//  Lines added to the older parts for expert mode are marked "EXPERT MODE".
+//
+//  HOW TIMING WORKS
+//  Everything is measured in audio FRAMES (samples), counted by the worklet.
+//  A period has this shape (default 1000 ms):
+//
+//     true tick        sync chirps         instructor chirp        next true tick
+//     |  students chirp    (after a shake)                               |
+//     0 ............... period/4 ............ period/2 ............... period
+//
+//  Two facts connect frames to the room:
+//    a) A sound we play at frame X is recorded by our own microphone at
+//       frame X + L. L ("loopback") is measured at start-up (part 6).
+//    b) A phone that is a sound-travel time d from the instructor records the
+//       instructor chirp at
+//           arrival = trueTick + period/2 + d
+//  So once a phone knows d, every instructor chirp tells it the next tick:
+//           nextTick = arrival - d - period/2 + period
+//  and it plays its own chirp at frame  nextTick - L,  so the chirp leaves
+//  the speaker exactly on the true tick.
+//
+//  "True tick" positions are kept in RECORDED frames: the frame at which our
+//  microphone would record a sound made on the tick right next to it. Only
+//  playAt needs the "- L".
+//
+//  KNOWN PITFALLS AND IDEAS FOR NEXT STEPS (also listed in README.md)
+//    - The timing uses only the latest instructor chirp. A misheard chirp
+//      (an echo, a loud neighbour) moves the next tick. Next step: a running
+//      fit through the last few chirps that ignores odd ones.
+//    - If the audio pauses (see chirp_worklet.js) while a phone is carrying
+//      the time to its seat, the carried time is wrong and nothing notices.
+//    - Nothing checks a phone's distance once it is measured. Next step:
+//      "calibration ticks" where every phone chirps, so each phone can see
+//      whether its neighbours seem shifted the same way (then it is wrong).
+//    - L is measured once. iOS may change it when the audio route changes
+//      (headphones, Bluetooth, mic settings).
+//    - Moving phones: a synced phone that moves must re-measure its distance
+//      ("Sync here" / "I'm seated" again). Next step: an "I'm moving" button.
+//    - Shake chains: each hand-over adds a small error.
+//    - Counting neighbours is only reliable for 0–2 (see countChirps, part 4).
+//    - Instructor commands (run / pause / reset as chirp shapes) are not
+//      built yet: each phone has its own Run button.
+//
+//  JavaScript notes for beginners:
+//    - "const" makes a variable that is never re-assigned; "let" one that can be.
+//    - "async function" marks a function that can WAIT for slow things (the
+//      network, the microphone permission dialog) using the word "await". Read
+//         const x = await something();
+//      as "start something, pause this function until it is done, put the
+//      answer in x". The rest of the page keeps running while it waits.
+//    - A "callback" is a function we hand to another function, to be called
+//      later when something has happened (for example, a recording is ready).
+
+
+// =====================================================================
+// 1. SETTINGS
+// =====================================================================
+const SPEED_OF_SOUND_M_PER_MS = 0.343; // sound travels 0.343 m in 1 ms
+const INSTRUCTOR_GAIN = 1.0;
+const SYNC_GAIN = 0.2;          // quiet: the two phones are touching
+const SYNC_CHIRPS = 5;          // sync chirps a synced phone plays after a shake
+const SHAKE_ACCELERATION = 15;  // m/s² (without gravity) that counts as a shake
+const MAX_MISSES = 3;           // missed instructor chirps in a row before we give up
+
+const SETTING_NAMES = ['periodMs', 'chirpMs', 'instructorChirpMs', 'gain', 'radiusM', 'threshold', 'maxRoomM'];
+let settings = null;
+const frames = {};   // settings converted to frames, filled in by computeFrames()
+
+// Settings in the address (e.g. ?periodMs=1200) replace the values in the boxes.
+function applyAddressSettings() {
+  const params = new URLSearchParams(location.search);
+  const names = SETTING_NAMES.concat(['cell']);
+  for (let i = 0; i < names.length; i++) {
+    if (params.has(names[i])) {
+      document.getElementById(names[i]).value = params.get(names[i]);
+    }
+  }
+  // EXPERT MODE: ?expert=1 ticks the expert box.
+  if (params.get('expert') === '1') {
+    document.getElementById('expert').checked = true;
+  }
+}
+
+function readSettings() {
+  const result = {};
+  for (let i = 0; i < SETTING_NAMES.length; i++) {
+    result[SETTING_NAMES[i]] = parseFloat(document.getElementById(SETTING_NAMES[i]).value);
+  }
+  result.cell = document.getElementById('cell').value.trim();
+  result.expert = document.getElementById('expert').checked; // EXPERT MODE
+  return result;
+}
+
+// Returns a problem description, or '' if the settings are fine.
+function checkSettings(s) {
+  if (!(s.periodMs >= 600)) {
+    return 'The period must be at least 600 ms.';
+  }
+  // The longest neighbour window (an unsynced phone's) must end well before
+  // the sync chirps at a quarter period.
+  const longestWindowMs = 16 + (s.radiusM + s.maxRoomM) / SPEED_OF_SOUND_M_PER_MS + s.chirpMs;
+  if (longestWindowMs > s.periodMs / 4 - 20) {
+    return 'The neighbour window does not fit: lengthen the period, or reduce the radius or room size.';
+  }
+  return '';
+}
+
+function computeFrames() {
+  frames.period = msToFrames(settings.periodMs);
+  frames.half = Math.round(frames.period / 2);
+  frames.quarter = Math.round(frames.period / 4);
+  frames.before = msToFrames(3);   // listen a little before the tick, for small timing errors
+  frames.noise = msToFrames(NOISE_MS);
+  frames.radius = msToFrames(settings.radiusM / SPEED_OF_SOUND_M_PER_MS);
+  frames.maxDistance = msToFrames(settings.maxRoomM / SPEED_OF_SOUND_M_PER_MS);
+  // Window around the expected instructor chirp: wide enough for someone
+  // walking across the room while carrying the time.
+  frames.instructorMargin = frames.maxDistance + msToFrames(20);
+}
+
+
+// =====================================================================
+// 2. SMALL HELPERS
+// =====================================================================
+
+function log(text) {
+  const box = document.getElementById('log');
+  const time = new Date().toTimeString().substring(0, 8);
+  box.textContent = time + '  ' + text + '\n' + box.textContent; // newest on top
+}
+
+function msToFrames(ms) {
+  return Math.round(ms * audio.sampleRate / 1000);
+}
+
+function framesToMs(n) {
+  return n * 1000 / audio.sampleRate;
+}
+
+// The middle value of a list (less affected by odd values than the average).
+function median(values) {
+  const copy = values.slice(); // slice() with no arguments makes a copy
+  // sort() needs a function that says which of two numbers comes first.
+  copy.sort(function (a, b) { return a - b; });
+  const middle = Math.floor(copy.length / 2);
+  if (copy.length % 2 === 1) {
+    return copy[middle];
+  }
+  return (copy[middle - 1] + copy[middle]) / 2;
+}
+
+// Shift a frame difference by whole periods so it lies between -period/2 and
+// +period/2. Example with a 1000 ms period: 1020 ms -> 20 ms, 990 ms -> -10 ms.
+function wrapToPeriod(n) {
+  return n - frames.period * Math.round(n / frames.period);
+}
+
+
+// =====================================================================
+// 3. CHIRP SHAPES
+// =====================================================================
+// Three different shapes, so a phone always knows what it is hearing:
+//   student:    rising sweep 2.5 -> 5.5 kHz
+//   instructor: falling sweep 5.5 -> 2.5 kHz
+//   sync:       up then down (only used when shaking phones together)
+
+// useCosine = true makes the same sweep with cos() instead of sin(): a copy
+// shifted by a quarter of a wave. Used by countChirps (part 4).
+function makeSweep(startHz, endHz, durationMs, sampleRate, useCosine) {
+  const n = Math.round(sampleRate * durationMs / 1000);
+  const wave = new Float32Array(n);
+  const fadeLength = Math.max(1, Math.round(n * 0.1)); // soft start and end, avoids clicks
+  let phase = 0;
+  for (let i = 0; i < n; i++) {
+    const frequency = startHz + (endHz - startHz) * i / n;
+    phase = phase + 2 * Math.PI * frequency / sampleRate;
+    let envelope = 1;
+    if (i < fadeLength) {
+      envelope = 0.5 - 0.5 * Math.cos(Math.PI * i / fadeLength);
+    } else if (i >= n - fadeLength) {
+      envelope = 0.5 - 0.5 * Math.cos(Math.PI * (n - 1 - i) / fadeLength);
+    }
+    if (useCosine) {
+      wave[i] = Math.cos(phase) * envelope;
+    } else {
+      wave[i] = Math.sin(phase) * envelope;
+    }
+  }
+  return wave;
+}
+
+function makeUpDown(lowHz, highHz, durationMs, sampleRate) {
+  const up = makeSweep(lowHz, highHz, durationMs / 2, sampleRate);
+  const down = makeSweep(highHz, lowHz, durationMs / 2, sampleRate);
+  const wave = new Float32Array(up.length + down.length);
+  wave.set(up, 0);            // copy "up" in at position 0
+  wave.set(down, up.length);  // and "down" right after it
+  return wave;
+}
+
+const templates = { student: null, studentCos: null, instructor: null, sync: null };
+
+function makeTemplates() {
+  templates.student = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate);
+  templates.studentCos = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate, true);
+  templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
+  templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
+  sendWaveform('student', templates.student);
+  sendWaveform('instructor', templates.instructor);
+  sendWaveform('sync', templates.sync);
+}
+
+
+// =====================================================================
+// 4. CHIRP SEARCH (normalized cross-correlation)
+// =====================================================================
+// Slide the chirp shape ("template") along the recording one sample at a
+// time. At each position ("shift") compute how similar they are, from -1 to 1
+// (1 = same shape, whatever the loudness). The result has one value per shift.
+
+function correlate(samples, template) {
+  const m = template.length;
+  const shifts = samples.length - m + 1;
+  const corr = new Float32Array(Math.max(shifts, 0));
+
+  let templateEnergy = 0;
+  for (let i = 0; i < m; i++) {
+    templateEnergy = templateEnergy + template[i] * template[i];
+  }
+
+  for (let shift = 0; shift < shifts; shift++) {
+    let dot = 0;
+    let energy = 0;
+    for (let i = 0; i < m; i++) {
+      const x = samples[shift + i];
+      dot = dot + x * template[i];
+      energy = energy + x * x;
+    }
+    if (energy > 1e-12) {
+      corr[shift] = dot / Math.sqrt(energy * templateEnergy);
+    }
+  }
+  return corr;
+}
+
+// The best match: { index: where it starts, value: how good, 0..1 }
+// PITFALL: in a room with echoes the strongest match is not always the first
+// (direct) sound. Using the first match above the threshold may be better.
+function strongestPeak(corr) {
+  let best = { index: -1, value: 0 };
+  for (let i = 0; i < corr.length; i++) {
+    if (corr[i] > best.value) {
+      best = { index: i, value: corr[i] };
+    }
+  }
+  return best;
+}
+
+// ---- Counting neighbour chirps ----
+// Neighbours' chirps overlap (they are 10 ms long but arrive within about
+// 3 ms of each other), which makes counting them harder than finding one:
+//   - correlate() divides by the loudness of the whole recording, so with
+//     several chirps overlapping, each one's match drops, and quieter ones
+//     fall below the threshold.
+//   - the match wiggles up and down with the sound wave itself, so one chirp
+//     can cross a threshold several times.
+// So the counting below works differently:
+//   1. Measure the background noise in the first part of the recording (just
+//      before the tick, when nobody chirps).
+//   2. Match with a sine AND a cosine version of the chirp and combine them
+//      (like the two sides of a right-angled triangle). This gives the smooth
+//      outline ("envelope") of the match, without the wiggle.
+//   3. Divide by what noise alone would give: a signal-to-noise ratio (SNR).
+//      Unlike correlate(), overlapping chirps don't lower each other's SNR.
+//   4. Count the peaks that are clearly above the noise, not much weaker than
+//      the strongest one (weaker bumps are side-effects of a strong chirp), and
+//      the highest point within PEAK_SEPARATION_MS either side.
+// In a simulated test with neighbours at random distances (0.2–1 m) and
+// random loudness: 0 and 1 neighbour were always counted right, 2 about 70%
+// of the time, and 3 or more were usually counted as 2 or 3.
+// PITFALL / RESEARCH QUESTION: chirps whose distances differ by less than about
+// 10 cm merge into one, a much quieter neighbour next to a loud one is missed,
+// and echoes may add counts. Ideas: wider-band or longer chirps, a few
+// different chirp shapes shared out between phones, or using the total chirp
+// loudness in the window instead of a count.
+const NOISE_MS = 10;             // length of the noise part at the start of each neighbour recording
+let MIN_SNR = 8;                 // a peak must be at least this many times the noise level
+                                 // ("let", not "const": the expert-mode slider changes it)
+const MIN_RELATIVE = 0.25;       // ...and at least this fraction of the strongest peak
+const PEAK_SEPARATION_MS = 0.25; // ...and the highest point within this distance either side
+
+// EXPERT MODE: countChirps also leaves some numbers here for the screen.
+const lastDetection = { strongestSnr: 0 };
+
+function countChirps(samples, sineTemplate, cosineTemplate, noiseFrames) {
+  const m = sineTemplate.length;
+
+  // 1. Background noise level (root mean square) of the first part.
+  let noiseEnergy = 0;
+  for (let i = 0; i < noiseFrames; i++) {
+    noiseEnergy = noiseEnergy + samples[i] * samples[i];
+  }
+  const noiseLevel = Math.sqrt(noiseEnergy / noiseFrames) + 1e-9; // + a tiny bit: never divide by 0
+
+  let templateEnergy = 0;
+  for (let i = 0; i < m; i++) {
+    templateEnergy = templateEnergy + sineTemplate[i] * sineTemplate[i];
+  }
+
+  // 2 and 3. SNR of the match envelope at every position after the noise part.
+  const shifts = samples.length - m + 1;
+  const snr = new Float32Array(Math.max(shifts, 0));
+  let strongest = 0;
+  for (let shift = noiseFrames; shift < shifts; shift++) {
+    let sineMatch = 0;
+    let cosineMatch = 0;
+    for (let i = 0; i < m; i++) {
+      sineMatch = sineMatch + samples[shift + i] * sineTemplate[i];
+      cosineMatch = cosineMatch + samples[shift + i] * cosineTemplate[i];
+    }
+    const envelope = Math.sqrt(sineMatch * sineMatch + cosineMatch * cosineMatch);
+    snr[shift] = envelope / (noiseLevel * Math.sqrt(templateEnergy));
+    strongest = Math.max(strongest, snr[shift]);
+  }
+
+  // 4. Count the peaks.
+  const separation = msToFrames(PEAK_SEPARATION_MS);
+  let count = 0;
+  for (let shift = noiseFrames; shift < shifts; shift++) {
+    if (snr[shift] < MIN_SNR || snr[shift] < MIN_RELATIVE * strongest) {
+      continue; // "continue" skips to the next shift
+    }
+    let isHighest = true;
+    const from = Math.max(0, shift - separation);
+    const to = Math.min(shifts - 1, shift + separation);
+    for (let j = from; j <= to; j++) {
+      if (snr[j] > snr[shift]) {
+        isHighest = false;
+      }
+    }
+    if (isHighest) {
+      count = count + 1;
+    }
+  }
+  lastDetection.strongestSnr = strongest; // EXPERT MODE: shown on screen
+  return count;
+}
+
+
+// =====================================================================
+// 5. STARTING AUDIO, AND TALKING TO chirp_worklet.js
+// =====================================================================
+const audio = {
+  ctx: null,          // the AudioContext
+  sampleRate: 48000,  // replaced by the real value when audio starts
+  node: null,         // AudioWorkletNode running chirp_worklet.js
+  micStream: null
+};
+
+function setSessionType(type) {
+  // navigator.audioSession only exists on iPhones (Safari 16.4+).
+  if ('audioSession' in navigator) {
+    try {
+      navigator.audioSession.type = type;
+    } catch (error) {
+      log('Could not set audioSession.type = ' + type);
+    }
+  }
+}
+
+async function startAudio(withMic) {
+  if (withMic) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('No microphone access. The page must be opened over https://');
+    }
+    // iPhones: the "kick order" ('auto', open the mic, then 'play-and-record')
+    // kept the speaker loud on all three iPhones in the October 2026 class test
+    // (test D). PITFALL: only tested on iOS 26.6; check iOS 18 and 27.
+    setSessionType('auto');
+    audio.micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      video: false
+    });
+    setSessionType('play-and-record');
+  } else {
+    // The instructor only plays. 'playback' also stops an iPhone's ringer
+    // switch from muting it.
+    setSessionType('playback');
+  }
+
+  // Some browsers call it webkitAudioContext. "a || b" means "a if it exists, otherwise b".
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioContextClass();
+  if (ctx.state === 'suspended') {
+    await ctx.resume();
+  }
+  audio.ctx = ctx;
+  audio.sampleRate = ctx.sampleRate;
+
+  await ctx.audioWorklet.addModule('chirp_worklet.js');
+  audio.node = new AudioWorkletNode(ctx, 'chirp-worklet', {
+    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1]
+  });
+  if (audio.micStream) {
+    ctx.createMediaStreamSource(audio.micStream).connect(audio.node); // microphone -> worklet
+  }
+  audio.node.connect(ctx.destination);                                // worklet -> speaker
+  audio.node.port.onmessage = onWorkletMessage;
+
+  // PITFALL: 'interrupted' or 'suspended' means the frame counter has stopped
+  // (see chirp_worklet.js). For now we only log it.
+  ctx.onstatechange = function () {
+    log('Audio state: ' + ctx.state);
+  };
+  log('Audio started: ' + audio.sampleRate + ' Hz');
+}
+
+// ---- messages to the worklet ----
+let nextRecordingId = 1;
+const recordingCallbacks = {};  // recordingCallbacks[id] = the function to call when that recording is ready
+
+function sendWaveform(name, samples) {
+  audio.node.port.postMessage({ type: 'waveform', name: name, samples: samples });
+}
+
+function playAt(frame, name, gain) {
+  audio.node.port.postMessage({ type: 'playAt', frame: Math.round(frame), name: name, gain: gain });
+}
+
+// Record "length" frames from "frame". When the recording is ready,
+// callback(samples, startFrame) is called. samples is null if it was too late.
+function recordAt(frame, length, callback) {
+  const id = nextRecordingId;
+  nextRecordingId = nextRecordingId + 1;
+  recordingCallbacks[id] = callback;
+  audio.node.port.postMessage({ type: 'recordAt', id: id, frame: Math.round(frame), length: Math.round(length) });
+}
+
+// The same as recordAt, for use with "await":
+//    const rec = await recordAndWait(frame, length);   // then use rec.samples, rec.startFrame
+function recordAndWait(frame, length) {
+  return new Promise(function (resolve) {
+    recordAt(frame, length, function (samples, startFrame) {
+      resolve({ samples: samples, startFrame: startFrame });
+    });
+  });
+}
+
+// ---- messages from the worklet ----
+function onWorkletMessage(event) {
+  const msg = event.data;
+  if (msg.type === 'recording' || (msg.type === 'tooLate' && msg.what === 'record')) {
+    const callback = recordingCallbacks[msg.id];
+    delete recordingCallbacks[msg.id];
+    if (!callback) {
+      return;
+    }
+    if (msg.type === 'recording') {
+      callback(msg.samples, msg.startFrame);
+    } else {
+      log('A recording was asked for too late and was skipped');
+      callback(null, msg.frame);
+    }
+  } else if (msg.type === 'tooLate') {
+    log('A chirp was asked for too late and was skipped');
+  }
+}
+
+// Roughly the frame the worklet is working on now (exact to one block).
+function nowFrame() {
+  return Math.floor(audio.ctx.currentTime * audio.sampleRate);
+}
+
+
+// =====================================================================
+// 6. OUR OWN SPEAKER -> MICROPHONE DELAY ("LOOPBACK")
+// =====================================================================
+// Play 5 quiet chirps and record them. The gaps between them are random, so
+// the regular chirps of the instructor or other phones cannot line up with
+// them. Then try every possible delay and keep the one where all 5 match best.
+
+let loopbackFrames = 0;   // L in "HOW TIMING WORKS" at the top
+
+async function measureLoopback() {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const delay = await tryLoopback();
+    if (delay !== null) {
+      loopbackFrames = delay;
+      log('Own speaker -> mic delay: ' + framesToMs(delay).toFixed(1) + ' ms');
+      return true;
+    }
+    log('Did not hear our own chirps (attempt ' + attempt + ' of 3)');
+  }
+  return false;
+}
+
+async function tryLoopback() {
+  const start = nowFrame() + msToFrames(200);
+  const offsets = [];
+  let t = 0;
+  for (let k = 0; k < 5; k++) {
+    offsets.push(t);
+    t = t + msToFrames(150 + Math.random() * 150);
+  }
+  for (let k = 0; k < 5; k++) {
+    playAt(start + offsets[k], 'student', 0.3);
+  }
+  const length = offsets[4] + templates.student.length + msToFrames(400); // allows a delay up to 400 ms
+  const rec = await recordAndWait(start, length);
+  if (rec.samples === null) {
+    return null;
+  }
+  const corr = correlate(rec.samples, templates.student);
+
+  let bestDelay = 0;
+  let bestScore = -1;
+  for (let d = 0; d + offsets[4] < corr.length; d++) {
+    let score = 0;
+    for (let k = 0; k < 5; k++) {
+      score = score + corr[offsets[k] + d];
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestDelay = d;
+    }
+  }
+  let heard = 0;
+  for (let k = 0; k < 5; k++) {
+    if (corr[offsets[k] + bestDelay] >= settings.threshold) {
+      heard = heard + 1;
+    }
+  }
+  if (heard < 3) {
+    return null;
+  }
+  // Chirp k was played at start + offsets[k] and recorded at start + offsets[k] + L.
+  // The recording began at "start", so the best delay IS L.
+  return bestDelay;
+}
+
+
+// =====================================================================
+// 7. INSTRUCTOR MODE
+// =====================================================================
+// The instructor device IS the clock: its chirps define the time. A true
+// tick is half a period before each instructor chirp. It does not listen.
+
+const instructorClock = { nextChirpFrame: 0 };
+
+function bookInstructorChirps() {
+  // Keep chirps booked 3 s ahead.
+  // PITFALL: browsers slow down timers in background tabs (to about once a
+  // second, or stop them on phones). 3 s ahead covers a slowed timer, but the
+  // instructor page should stay in front and the device must not sleep.
+  const bookUntil = nowFrame() + msToFrames(3000);
+  while (instructorClock.nextChirpFrame < bookUntil) {
+    playAt(instructorClock.nextChirpFrame, 'instructor', INSTRUCTOR_GAIN);
+    flashAtFrame(instructorClock.nextChirpFrame);
+    instructorClock.nextChirpFrame = instructorClock.nextChirpFrame + frames.period;
+  }
+}
+
+
+// =====================================================================
+// 8. FOLLOWING THE INSTRUCTOR CHIRP
+// =====================================================================
+// One recording per period, around where the next instructor chirp should
+// be. Each one, heard or not, moves the whole app on by one tick.
+
+const instructor = {
+  lastArrival: null,   // recorded frame of the last instructor chirp (heard or guessed)
+  misses: 0            // missed chirps in a row
+};
+
+function listenForInstructor() {
+  // EXPERT MODE: with the own clock chosen, stop following the instructor.
+  // The loop is restarted by setClockSource('instructor') (part 13).
+  if (clockSource !== 'instructor') {
+    instructorLoopRunning = false;
+    return;
+  }
+  instructorLoopRunning = true;
+  const earliest = nowFrame() + msToFrames(20);
+  let start = null;
+  let length = 0;
+  if (instructor.lastArrival !== null && instructor.misses < MAX_MISSES) {
+    // We know roughly where it will be: listen around there.
+    start = instructor.lastArrival + frames.period - frames.instructorMargin;
+    length = 2 * frames.instructorMargin + templates.instructor.length;
+  }
+  if (start === null || start < earliest) {
+    // We don't know where it is (or we fell behind): listen to a whole period.
+    start = earliest;
+    length = frames.period + templates.instructor.length;
+  }
+  recordAt(start, length, onInstructorWindow);
+}
+
+function onInstructorWindow(samples, startFrame) {
+  // EXPERT MODE: the clock was switched to "own" while we were recording.
+  if (clockSource !== 'instructor') {
+    instructorLoopRunning = false;
+    return;
+  }
+  let arrival = null;
+  let heard = false;
+  if (samples !== null) {
+    const peak = strongestPeak(correlate(samples, templates.instructor));
+    if (peak.value >= settings.threshold) {
+      arrival = startFrame + peak.index;
+      heard = true;
+    }
+  }
+
+  if (heard) {
+    instructor.misses = 0;
+  } else {
+    instructor.misses = instructor.misses + 1;
+    if (instructor.lastArrival !== null && instructor.misses < MAX_MISSES) {
+      // Not heard: assume it came exactly one period after the last one.
+      arrival = instructor.lastArrival + frames.period;
+      while (arrival < startFrame) {
+        arrival = arrival + frames.period;
+      }
+    }
+  }
+
+  if (arrival !== null) {
+    instructor.lastArrival = arrival;
+    updateSync(arrival, heard);
+    const tick = nextTick(arrival);
+    runTick(tick);
+  }
+  listenForInstructor(); // book the next one
+}
+
+
+// =====================================================================
+// 9. GETTING SYNCED: AT THE SPEAKER, CARRYING, SEATED
+// =====================================================================
+// sync.state is one of:
+//   'none'      not synced. The screen follows the simulation, but the phone stays silent.
+//   'seeding'   held next to the instructor speaker: learning the true time
+//   'carrying'  knows the true time and is being walked to its seat. It
+//               ignores the instructor (its chirp would arrive later and later)
+//               and runs on its own frame counter.
+//   'measuring' at its seat, knows the true time: measuring its distance d
+//   'synced'    knows d. Every instructor chirp re-sets the tick.
+
+const sync = {
+  state: 'none',
+  anchor: null,        // recorded frame of a true tick (any one), or null
+  distanceFrames: 0,   // d: sound travel time from the instructor, in frames
+  samples: [],         // values collected while seeding or measuring
+  coastTicks: 0        // > 0: ignore the instructor for this many chirps (while shaking)
+};
+
+function updateSync(arrival, heard) {
+  if (!heard) {
+    return; // a guessed arrival tells us nothing new
+  }
+  if (sync.state === 'seeding') {
+    // Right next to the speaker d = 0, so the true tick is half a period before the chirp.
+    sync.samples.push(arrival - frames.half);
+    if (sync.samples.length === 3) {
+      sync.anchor = averageTickPosition(sync.samples);
+      sync.state = 'carrying';
+      log('Synced at the speaker. Walk to your seat, then tap "I\'m seated".');
+    }
+  } else if (sync.state === 'measuring') {
+    // How much later than "d = 0" did the chirp arrive? That is d.
+    sync.samples.push(wrapToPeriod(arrival - frames.half - sync.anchor));
+    if (sync.samples.length === 3) {
+      sync.distanceFrames = Math.round(median(sync.samples));
+      sync.anchor = arrival - sync.distanceFrames - frames.half;
+      sync.state = 'synced';
+      log('Synced: ' + (framesToMs(sync.distanceFrames) * SPEED_OF_SOUND_M_PER_MS).toFixed(1) +
+          ' m from the instructor');
+    }
+  } else if (sync.state === 'synced') {
+    if (sync.coastTicks > 0) {
+      // We are shaking phones with a neighbour and may have moved a little:
+      // keep the tick we had (our frame counter carries it).
+      sync.coastTicks = sync.coastTicks - 1;
+      return;
+    }
+    const newAnchor = arrival - sync.distanceFrames - frames.half;
+    const jump = wrapToPeriod(newAnchor - sync.anchor);
+    if (Math.abs(jump) > msToFrames(2)) {
+      // PITFALL: this can be an audio pause on our side, an echo, or us moving.
+      // This first version just follows the latest chirp.
+      log('Instructor chirp moved by ' + framesToMs(jump).toFixed(1) + ' ms');
+    }
+    sync.anchor = newAnchor;
+  }
+  // 'carrying' and 'none': nothing to update.
+}
+
+// Several measurements of "a true tick", each a whole number of periods
+// apart, combined into one frame.
+function averageTickPosition(values) {
+  const first = values[0];
+  const offsets = [];
+  for (let i = 0; i < values.length; i++) {
+    offsets.push(wrapToPeriod(values[i] - first));
+  }
+  return first + median(offsets);
+}
+
+// The next true tick after an instructor chirp (in recorded frames), and
+// whether we can trust it: { frame, reliable }
+function nextTick(arrival) {
+  if (sync.anchor !== null && sync.state !== 'seeding') {
+    // The first tick of the form  anchor + whole periods  that comes after the chirp.
+    const periodsAhead = Math.ceil((arrival - sync.anchor) / frames.period);
+    return { frame: sync.anchor + periodsAhead * frames.period, reliable: true };
+  }
+  // Not synced: pretend we sit right next to the instructor (d = 0).
+  return { frame: arrival - frames.half + frames.period, reliable: false };
+}
+
+function onSyncHere() {
+  if (clockSource !== 'instructor') {   // EXPERT MODE
+    log('"Sync here" needs the clock set to "Follow instructor chirps".');
+    return;
+  }
+  sync.state = 'seeding';
+  sync.anchor = null;
+  sync.samples = [];
+  log('Hold the phone still, right next to the instructor speaker…');
+}
+
+function onSeated() {
+  if (sync.state !== 'carrying') {
+    log('"I\'m seated" is for after "Sync here".');
+    return;
+  }
+  sync.state = 'measuring';
+  sync.samples = [];
+  log('Measuring your distance to the instructor…');
+}
+
+
+// =====================================================================
+// 10. SHAKE SYNC WITH A NEIGHBOUR
+// =====================================================================
+// Two phones are held together and shaken. Both notice the shake:
+//   - a phone that knows the true time plays SYNC_CHIRPS quiet sync chirps,
+//     each a quarter period after a true tick
+//   - a phone that doesn't listens for them; since the phones touch, the
+//     chirp arrives with no delay, which tells it the true tick
+// Then the new phone measures its own distance to the instructor.
+// PITFALL: if several pairs shake at once, a phone may hear another pair's
+// sync chirps. All synced phones play them at the same true time, so the
+// partner (closest, loudest) usually wins, but this is untested.
+
+const shake = { strongTimes: [], lastShake: 0 };
+const neighbourSync = { active: false, found: [], windowsLeft: 0 };
+
+// iPhones only allow the motion sensor after asking, inside a tap.
+function requestMotionPermission() {
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission()
+      .then(function (answer) { log('Motion sensor: ' + answer); })
+      .catch(function () { log('Motion sensor not allowed: use the "Sync with neighbour" button'); });
+  }
+}
+
+function onMotion(event) {
+  let size = 0;
+  const a = event.acceleration; // without gravity, if the phone provides it
+  if (a && a.x !== null) {
+    size = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+  } else if (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x !== null) {
+    const g = event.accelerationIncludingGravity;
+    size = Math.abs(Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) - 9.81);
+  }
+  const now = performance.now();
+  if (size > SHAKE_ACCELERATION) {
+    shake.strongTimes.push(now);
+  }
+  // Keep only the last second.
+  while (shake.strongTimes.length > 0 && shake.strongTimes[0] < now - 1000) {
+    shake.strongTimes.shift(); // shift() removes the oldest (first) value
+  }
+  if (shake.strongTimes.length >= 5 && now - shake.lastShake > 8000) {
+    shake.lastShake = now;
+    shake.strongTimes = [];
+    log('Shake!');
+    startNeighbourSync();
+  }
+}
+
+function startNeighbourSync() {
+  if (audio.node === null || frames.period === undefined) {
+    return;
+  }
+  if (sync.state === 'synced' || sync.state === 'carrying') {
+    sendSyncChirps();
+  } else {
+    receiveSyncChirps();
+  }
+}
+
+function sendSyncChirps() {
+  if (sync.state === 'synced') {
+    sync.coastTicks = SYNC_CHIRPS + 2;
+  }
+  // The first true tick that leaves time to book the chirp.
+  const soon = nowFrame() + loopbackFrames + msToFrames(100);
+  const firstTick = sync.anchor + Math.ceil((soon - sync.anchor) / frames.period) * frames.period;
+  for (let n = 0; n < SYNC_CHIRPS; n++) {
+    playAt(firstTick + n * frames.period + frames.quarter - loopbackFrames, 'sync', SYNC_GAIN);
+  }
+  log('Sending the time to a neighbour…');
+}
+
+function receiveSyncChirps() {
+  if (neighbourSync.active) {
+    return;
+  }
+  neighbourSync.active = true;
+  neighbourSync.found = [];
+  neighbourSync.windowsLeft = SYNC_CHIRPS + 1;
+  log('Listening for a neighbour\'s sync chirps…');
+  // Record whole periods, one after another, all booked now.
+  const start = nowFrame() + msToFrames(30);
+  for (let n = 0; n < SYNC_CHIRPS + 1; n++) {
+    recordAt(start + n * frames.period, frames.period + templates.sync.length, onSyncWindow);
+  }
+}
+
+function onSyncWindow(samples, startFrame) {
+  if (samples !== null) {
+    const peak = strongestPeak(correlate(samples, templates.sync));
+    if (peak.value >= settings.threshold) {
+      // Played a quarter period after a true tick, heard with no delay.
+      neighbourSync.found.push(startFrame + peak.index - frames.quarter);
+    }
+  }
+  neighbourSync.windowsLeft = neighbourSync.windowsLeft - 1;
+  if (neighbourSync.windowsLeft === 0) {
+    finishNeighbourSync();
+  }
+}
+
+function finishNeighbourSync() {
+  neighbourSync.active = false;
+  const found = neighbourSync.found;
+  if (found.length < 3) {
+    log('Heard only ' + found.length + ' sync chirps. Is the other phone synced? Try again.');
+    return;
+  }
+  const anchor = averageTickPosition(found);
+  let worst = 0;
+  for (let i = 0; i < found.length; i++) {
+    worst = Math.max(worst, Math.abs(wrapToPeriod(found[i] - anchor)));
+  }
+  if (worst > msToFrames(2)) {
+    log('The sync chirps did not agree (' + framesToMs(worst).toFixed(1) + ' ms). Try again.');
+    return;
+  }
+  sync.anchor = anchor;
+  if (clockSource === 'own') {
+    // EXPERT MODE: no instructor, so there is no distance to measure. The
+    // phones touched, so this tick is right for this spot in the room.
+    sync.state = 'synced';
+    sync.distanceFrames = 0;
+    startOwnClock();
+    log('Got the time from the nearby phone (spread ' + framesToMs(worst).toFixed(1) + ' ms). Synced.');
+    return;
+  }
+  sync.state = 'measuring';
+  sync.samples = [];
+  log('Got the time from the neighbour. Measuring your distance to the instructor…');
+}
+
+
+// =====================================================================
+// 11. THE SIMULATION AND THE CELL FILE
+// =====================================================================
+// The cell's behaviour is in a separate file (default cells/basic.js). It
+// calls registerCell({ name, controls, start, step }). Once per tick this
+// program calls  step(state, input, settings)  and the cell answers
+// { fire: true/false, color: '...' }. See cells/basic.js for the details.
+
+const sim = {
+  cell: null,          // the cell definition from the cell file
+  loaded: null,        // set by registerCell() while a cell file loads
+  state: {},           // the cell's own notebook, kept between ticks
+  running: false,
+  fireNext: false,     // the cell decided to fire on the next tick
+  pressed: {},         // buttons pressed since the last tick, e.g. { stimulate: true }
+  controlInputs: {},   // the slider elements, by id
+  ticks: 0,
+  lastNeighbours: 0
+};
+
+// A simple cell, used if the cell file can't be loaded.
+const BUILT_IN_CELL = {
+  name: 'Built-in cell (the cell file did not load)',
+  controls: [
+    { id: 'threshold', type: 'slider', label: 'Neighbours needed to fire', min: 1, max: 6, value: 2 },
+    { id: 'stimulate', type: 'button', label: 'Fire now' }
+  ],
+  start: function (state) { state.restingIn = 0; },
+  step: function (state, input, settings) {
+    if (state.restingIn > 0) {
+      state.restingIn = state.restingIn - 1;
+      return { fire: false, color: 'dimgray' };
+    }
+    if (input.neighbours >= settings.threshold || input.pressed.stimulate) {
+      state.restingIn = 4;
+      return { fire: true, color: 'white' };
+    }
+    return { fire: false, color: 'darkgreen' };
+  }
+};
+
+// The cell file calls this.
+function registerCell(definition) {
+  sim.loaded = definition;
+}
+
+function loadCell(path, done) {
+  // SAFETY: a cell file runs as part of this page and could use the
+  // microphone. Only files in this site's cells/ folder are allowed, never a
+  // file from another web site.
+  if (!/^cells\/[A-Za-z0-9_\-]+\.js$/.test(path)) {
+    log('The cell file must look like cells/name.js. Using the built-in cell.');
+    done(BUILT_IN_CELL);
+    return;
+  }
+  sim.loaded = null;
+  const script = document.createElement('script');
+  // "?v=..." makes the browser fetch a fresh copy instead of an old saved one,
+  // so an edited cell file is used straight away.
+  script.src = path + '?v=' + Date.now();
+  script.onload = function () {
+    if (sim.loaded === null) {
+      log(path + ' did not call registerCell() (a typo in the file?). Using the built-in cell.');
+      done(BUILT_IN_CELL);
+    } else {
+      done(sim.loaded);
+    }
+  };
+  script.onerror = function () {
+    log('Could not load ' + path + '. Using the built-in cell.');
+    done(BUILT_IN_CELL);
+  };
+  document.head.appendChild(script);
+}
+
+function setupCell(cell) {
+  sim.cell = cell;
+  document.getElementById('cellName').textContent = cell.name || 'Cell';
+  buildControls(cell.controls || []);
+  sim.state = {};
+  try {
+    if (cell.start) {
+      cell.start(sim.state, readCellSettings());
+    }
+  } catch (error) {
+    log('Error in the cell file (start): ' + error.message);
+  }
+  log('Cell: ' + (cell.name || 'unnamed'));
+}
+
+// Make the sliders and buttons the cell file asks for.
+function buildControls(controls) {
+  const box = document.getElementById('cellControls');
+  box.innerHTML = '';
+  sim.controlInputs = {};
+  for (let i = 0; i < controls.length; i++) {
+    const c = controls[i];
+    if (c.type === 'slider') {
+      const label = document.createElement('div');
+      const valueText = document.createElement('b');
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = c.min;
+      slider.max = c.max;
+      slider.step = c.step || 1;
+      slider.value = c.value;
+      valueText.textContent = c.value;
+      slider.addEventListener('input', function () {
+        valueText.textContent = slider.value;
+      });
+      label.textContent = c.label + ': ';
+      label.appendChild(valueText);
+      box.appendChild(label);
+      box.appendChild(slider);
+      sim.controlInputs[c.id] = slider;
+    } else if (c.type === 'button') {
+      const button = document.createElement('button');
+      button.textContent = c.label;
+      button.addEventListener('click', function () {
+        sim.pressed[c.id] = true;
+        log('"' + c.label + '" pressed: the cell decides at the next tick');
+      });
+      box.appendChild(button);
+    }
+  }
+}
+
+// The current slider values, e.g. { threshold: 2, refractory: 4 }
+function readCellSettings() {
+  const values = {};
+  for (const id in sim.controlInputs) {   // "for ... in" goes through the names in an object
+    values[id] = parseFloat(sim.controlInputs[id].value);
+  }
+  return values;
+}
+
+// Called once per period, about half a period before the tick.
+function runTick(tick) {
+  // EXPERT MODE: beacon, instructor chirps and the loudness test (part 13).
+  expertTickExtras(tick);
+  if (loud.role !== '') {
+    return; // the loudness test uses the ticks instead of the simulation
+  }
+  if (!sim.running || sim.cell === null) {
+    return;
+  }
+  if (sim.fireNext) {
+    sim.fireNext = false;
+    // Only a synced phone makes a sound; an unsynced one just flashes.
+    if (tick.reliable && sync.state === 'synced') {
+      playAt(tick.frame - loopbackFrames, 'student', settings.gain);
+    }
+    flashAtFrame(tick.frame);
+    // A cell that fires is refractory, so it does not listen on this tick and
+    // never has to tell its own chirp from a neighbour's.
+    // PITFALL: this relies on the cell file staying refractory after firing
+    // (cells/basic.js does). A cell that could fire again straight away would
+    // be re-triggered by the wave it started, sending a wave backward.
+    stepCell(0);
+    showDetection(null); // EXPERT MODE: "didn't listen" on the display
+    return;
+  }
+  // Listen for neighbours from just before the tick until a chirp from the
+  // edge of the neighbour radius has fully arrived. The recording starts
+  // NOISE_MS earlier still, to measure the background noise (see countChirps).
+  let start = tick.frame - frames.before - frames.noise;
+  let length = frames.noise + 2 * frames.before + frames.radius + templates.student.length;
+  if (!tick.reliable) {
+    // Not synced: our tick may be up to the room size late, so listen earlier.
+    // PITFALL: the longer window also lets in neighbours from farther away.
+    start = start - frames.maxDistance;
+    length = length + frames.maxDistance;
+  }
+  recordAt(start, length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      count = countChirps(samples, templates.student, templates.studentCos, frames.noise);
+    }
+    stepCell(count);
+    showDetection(count); // EXPERT MODE: big display of what was heard
+  });
+}
+
+function stepCell(neighbours) {
+  const input = { neighbours: neighbours, pressed: sim.pressed };
+  sim.pressed = {};
+  let result = null;
+  try {
+    result = sim.cell.step(sim.state, input, readCellSettings());
+  } catch (error) {
+    log('Error in the cell file (step): ' + error.message);
+  }
+  if (!result) {
+    result = { fire: false };
+  }
+  sim.fireNext = result.fire === true;
+  if (result.color) {
+    document.body.style.background = result.color;
+  }
+  sim.ticks = sim.ticks + 1;
+  sim.lastNeighbours = neighbours;
+}
+
+
+// =====================================================================
+// 12. SCREEN AND BUTTONS
+// =====================================================================
+let role = '';   // 'student' or 'instructor'
+
+// Flash the screen white when a chirp plays (roughly on time).
+function flashAtFrame(frame) {
+  const waitTime = framesToMs(frame - nowFrame());
+  setTimeout(function () {
+    document.body.classList.add('flash');
+    setTimeout(function () { document.body.classList.remove('flash'); }, 100);
+  }, Math.max(0, waitTime));
+}
+
+function syncDescription() {
+  // EXPERT MODE: own clock
+  if (clockSource === 'own') {
+    if (sync.state === 'synced') {
+      return 'Own clock: synced.' + (expert.beacon ? ' Sending the time (beacon).' : '') +
+             (expert.actInstructor ? ' Playing instructor chirps.' : '');
+    }
+    if (neighbourSync.active) {
+      return 'Listening for a nearby phone\'s beacon… hold the phones a few cm apart.';
+    }
+    return 'Own clock: not synced (silent). Tap "Be the reference clock", or get the time from a nearby phone.';
+  }
+  if (instructor.misses >= MAX_MISSES) {
+    return 'Instructor not heard. Is its page running and loud enough?';
+  }
+  if (sync.state === 'none') {
+    return 'Not synced (silent). Tap "Sync here" next to the instructor speaker, or shake with a synced neighbour.';
+  }
+  if (sync.state === 'seeding') {
+    return 'Hold still next to the speaker… (' + sync.samples.length + '/3)';
+  }
+  if (sync.state === 'carrying') {
+    return 'Carrying the time: walk to your seat, then tap "I\'m seated".';
+  }
+  if (sync.state === 'measuring') {
+    return 'Measuring your distance to the instructor… (' + sync.samples.length + '/3)';
+  }
+  const metres = framesToMs(sync.distanceFrames) * SPEED_OF_SOUND_M_PER_MS;
+  return 'Synced, ' + metres.toFixed(1) + ' m from the instructor.';
+}
+
+function updateScreen() {
+  const dot = document.getElementById('dot');
+  let text = '';
+  if (role === 'instructor') {
+    dot.style.background = '#2ecc40';
+    text = 'Instructor clock: one chirp every ' + settings.periodMs + ' ms. Keep this page in front.';
+  } else {
+    if (clockSource === 'instructor' && instructor.misses >= MAX_MISSES) {
+      dot.style.background = '#e03030';
+    } else if (sync.state === 'synced') {
+      dot.style.background = '#2ecc40';
+    } else if (sync.state === 'none') {
+      dot.style.background = '#555';
+    } else {
+      dot.style.background = '#e0a000';
+    }
+    text = syncDescription() +
+           '\nOwn delay ' + framesToMs(loopbackFrames).toFixed(1) + ' ms' +
+           (clockSource === 'instructor' && instructor.misses > 0 ?
+              ', missed ' + instructor.misses + ' instructor chirp(s)' : '') +
+           '\nSimulation: ' + (sim.running ? 'running' : 'paused') + ', tick ' + sim.ticks +
+           ', neighbours heard last tick: ' + sim.lastNeighbours;
+  }
+  document.getElementById('status').textContent = text;
+}
+
+function disableRoleButtons() {
+  document.getElementById('studentBtn').disabled = true;
+  document.getElementById('instructorBtn').disabled = true;
+}
+
+async function startStudent() {
+  settings = readSettings();
+  const problem = checkSettings(settings);
+  if (problem !== '') {
+    log(problem);
+    return;
+  }
+  disableRoleButtons();
+  role = 'student';
+  try {
+    await startAudio(true);
+    computeFrames();
+    makeTemplates();
+    setInterval(updateScreen, 250);
+    log('Measuring the delay from our speaker to our microphone…');
+    const ok = await measureLoopback();
+    if (!ok) {
+      log('Could not hear our own chirps. Turn the volume up and reload the page.');
+      return;
+    }
+    // The own chirp must be booked after the instructor chirp is processed
+    // and before its tick. Warn if this phone's delay leaves too little time.
+    const spareMs = framesToMs(frames.half - frames.maxDistance - frames.instructorMargin - loopbackFrames);
+    if (spareMs < 50) {
+      log('Warning: only ' + spareMs.toFixed(0) + ' ms to spare per tick; chirps may be late. Lengthen the period.');
+    }
+    loadCell(settings.cell, setupCell);
+    document.getElementById('syncCard').hidden = false;
+    document.getElementById('cellCard').hidden = false;
+    if (settings.expert) {
+      setupExpertMode();   // EXPERT MODE: part 13. Starts on the own clock.
+    } else {
+      listenForInstructor();
+    }
+  } catch (error) {
+    log('ERROR: ' + error);
+  }
+}
+
+async function startInstructor() {
+  settings = readSettings();
+  disableRoleButtons();
+  role = 'instructor';
+  try {
+    await startAudio(false);
+    computeFrames();
+    makeTemplates();
+    document.body.style.background = '#0b2a4a';
+    instructorClock.nextChirpFrame = nowFrame() + msToFrames(500);
+    bookInstructorChirps();
+    setInterval(bookInstructorChirps, 250);
+    setInterval(updateScreen, 250);
+  } catch (error) {
+    log('ERROR: ' + error);
+  }
+}
+
+function onRun() {
+  sim.running = !sim.running;   // "!" means "not": true becomes false and false becomes true
+  document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
+}
+
+// =====================================================================
+// 13. SMALL GROUP / EXPERT MODE
+// =====================================================================
+// For a small group (about 10 students) who can sync again between runs and
+// want to see and change what is going on. See "EXPERT MODE" at the top.
+//
+// THE OWN CLOCK
+// Instead of being told the tick by each instructor chirp, the phone counts
+// periods on its own frame counter, starting from sync.anchor:
+//     tick = sync.anchor + k * period      (k = 0, 1, 2, ...)
+// Two phones agree on the tick if they got sync.anchor from each other while
+// a few cm apart (the sound delay between them is then about 0).
+// PITFALL: each phone's audio clock runs very slightly fast or slow (often
+// 10–50 parts per million, i.e. 0.6–3 ms per minute). With no instructor to
+// correct it, phones drift apart, so the group should sync again every few
+// minutes. Measuring this drift on real phones would be a good project.
+
+let clockSource = 'instructor';     // 'instructor' or 'own'
+let instructorLoopRunning = false;  // true while listenForInstructor keeps re-booking itself
+
+const expert = {
+  beacon: false,          // play a sync chirp a quarter period after every tick
+  actInstructor: false,   // play an instructor chirp half a period after every tick
+  history: []             // neighbour counts of the last ticks, for the display
+};
+
+const ownClock = { timer: null, nextTick: 0 };
+
+const loud = {
+  role: '',               // '' (off), 'A' or 'B'
+  own: [],                // last few loudness measurements of our own chirp
+  partner: []             // ...and of the partner's chirp
+};
+
+function setupExpertMode() {
+  document.getElementById('expertCard').hidden = false;
+  document.getElementById('detectBox').hidden = false;
+  document.getElementById('resetCellBtn').hidden = false;
+
+  // Put the current values into the tuning controls.
+  document.getElementById('thresholdSlider').value = settings.threshold;
+  document.getElementById('minSnrSlider').value = MIN_SNR;
+  document.getElementById('gainSlider').value = settings.gain;
+  document.getElementById('radiusSelect').value = String(settings.radiusM);
+  document.getElementById('chirpSelect').value = String(settings.chirpMs);
+  showTuningValues();
+
+  document.getElementById('clockSelect').value = 'own';
+  setClockSource('own');
+  log('Expert mode. Own clock: one phone taps "Be the reference clock".');
+}
+
+// ---- choosing the clock ----
+function setClockSource(source) {
+  if (source === clockSource) {
+    return;
+  }
+  clockSource = source;
+  if (source === 'own') {
+    stopOwnClock();
+    // A phone that already knows the true tick keeps it.
+    if (sync.anchor !== null && (sync.state === 'synced' || sync.state === 'carrying' || sync.state === 'measuring')) {
+      sync.state = 'synced';
+      startOwnClock();
+      log('Own clock: carrying on with the time we had.');
+    } else {
+      sync.state = 'none';
+      sync.anchor = null;
+    }
+    // listenForInstructor stops by itself at its next recording.
+  } else {
+    stopOwnClock();
+    setActInstructor(false);  // we would hear our own instructor chirps
+    instructor.lastArrival = null;
+    instructor.misses = 0;
+    if (sync.state === 'synced' && sync.anchor !== null) {
+      // We know the true tick: measure our distance to the instructor.
+      sync.state = 'measuring';
+      sync.samples = [];
+      log('Following the instructor: measuring your distance to it…');
+    } else {
+      sync.state = 'none';
+    }
+    if (!instructorLoopRunning) {
+      listenForInstructor();
+    }
+  }
+}
+
+// ---- running the own clock ----
+// A timer checks every 20 ms whether the next tick is close. runTick is called
+// about 0.4 period before the tick: enough time to book the chirp and the
+// recording, like in instructor mode.
+function startOwnClock() {
+  stopOwnClock();
+  if (sync.anchor === null) {
+    return;
+  }
+  const lead = Math.round(frames.period * 0.4);
+  const soon = nowFrame() + lead + loopbackFrames + msToFrames(50);
+  // The first tick of the form  anchor + whole periods  that is not too soon.
+  ownClock.nextTick = sync.anchor + Math.ceil((soon - sync.anchor) / frames.period) * frames.period;
+  ownClock.timer = setInterval(ownClockLoop, 20);
+}
+
+function stopOwnClock() {
+  if (ownClock.timer !== null) {
+    clearInterval(ownClock.timer);
+    ownClock.timer = null;
+  }
+}
+
+function ownClockLoop() {
+  const lead = Math.round(frames.period * 0.4);
+  const now = nowFrame();
+  if (now < ownClock.nextTick - lead) {
+    return; // not yet
+  }
+  if (now > ownClock.nextTick - loopbackFrames - msToFrames(20)) {
+    // We are too late for this tick (the page was busy or in the background):
+    // skip ahead instead of playing a late chirp.
+    log('Own clock: a tick was skipped (page too slow)');
+    ownClock.nextTick = ownClock.nextTick + frames.period;
+    return;
+  }
+  const tick = { frame: ownClock.nextTick, reliable: true };
+  ownClock.nextTick = ownClock.nextTick + frames.period;
+  runTick(tick);
+}
+
+function onReference() {
+  if (clockSource !== 'own') {
+    log('"Be the reference clock" needs the clock set to "Own clock".');
+    return;
+  }
+  // Any frame will do: this phone's ticks now DEFINE the true time.
+  sync.anchor = nowFrame() + msToFrames(500);
+  sync.distanceFrames = 0;
+  sync.state = 'synced';
+  startOwnClock();
+  setBeacon(true);
+  log('This phone is now the reference clock (beacon on).');
+}
+
+function onGetTime() {
+  // Listen for a nearby phone's sync chirps, even if we are synced already.
+  setBeacon(false);   // we would hear our own beacon
+  setActInstructor(false);
+  stopLoudnessTest();
+  if (sim.running) {
+    onRun();          // pause: our own chirps would get in the way
+  }
+  receiveSyncChirps();
+}
+
+function onForget() {
+  stopOwnClock();
+  setBeacon(false);
+  setActInstructor(false);
+  stopLoudnessTest();
+  sync.state = 'none';
+  sync.anchor = null;
+  sync.samples = [];
+  log('Sync forgotten. This phone is silent until it syncs again.');
+}
+
+// ---- toggles ----
+function setBeacon(on) {
+  expert.beacon = on;
+  const button = document.getElementById('beaconBtn');
+  button.textContent = 'Send the time (beacon): ' + (on ? 'ON' : 'off');
+  button.classList.toggle('on', on);  // toggle(name, true/false) adds or removes the class
+}
+
+function setActInstructor(on) {
+  if (on && clockSource !== 'own') {
+    log('Only a phone on its own clock can play instructor chirps.');
+    on = false;
+  }
+  expert.actInstructor = on;
+  const button = document.getElementById('actInstructorBtn');
+  button.textContent = 'Also play instructor chirps: ' + (on ? 'ON' : 'off');
+  button.classList.toggle('on', on);
+}
+
+// ---- extra chirps on every tick (called by runTick, part 11) ----
+function expertTickExtras(tick) {
+  if (sync.state !== 'synced' || !tick.reliable) {
+    return; // only a synced phone may make timing sounds
+  }
+  if (expert.beacon) {
+    // Same place in the period as the shake sync chirps (part 10).
+    playAt(tick.frame + frames.quarter - loopbackFrames, 'sync', SYNC_GAIN);
+  }
+  if (expert.actInstructor) {
+    playAt(tick.frame + frames.half - loopbackFrames, 'instructor', INSTRUCTOR_GAIN);
+  }
+  if (loud.role !== '') {
+    loudnessTick(tick);
+  }
+}
+
+// ---- loudness test ----
+// Phone A chirps on the tick, phone B at 3/4 period. Both phones record both
+// chirps and measure how loud each is. This shows:
+//   - each chirp's SNR (how far above the background noise), in dB
+//   - the partner's chirp compared with our own, in dB (0 dB = equally loud,
+//     -6 dB = half as loud). Ideally all phones are equally loud, so that
+//     distance, not the phone model, decides who counts as a neighbour.
+// dB = 20 * log10(amplitude ratio).
+
+function startLoudnessTest(role) {
+  if (sync.state !== 'synced') {
+    log('The loudness test needs a synced phone.');
+    return;
+  }
+  if (sim.running) {
+    onRun();  // pause the simulation
+  }
+  loud.role = role;
+  loud.own = [];
+  loud.partner = [];
+  document.getElementById('loudResult').textContent = 'Loudness test as ' + role + '…';
+  log('Loudness test: this phone is ' + role);
+}
+
+function stopLoudnessTest() {
+  if (loud.role !== '') {
+    log('Loudness test stopped');
+  }
+  loud.role = '';
+}
+
+function loudnessTick(tick) {
+  const slotA = tick.frame;
+  const slotB = tick.frame + Math.round(frames.period * 0.75);
+  let ownSlot = slotA;
+  let partnerSlot = slotB;
+  if (loud.role === 'B') {
+    ownSlot = slotB;
+    partnerSlot = slotA;
+  }
+  playAt(ownSlot - loopbackFrames, 'student', settings.gain);
+
+  // Recording: noise part, then from 5 ms before the slot to 15 ms after the chirp.
+  const margin = msToFrames(5);
+  const length = frames.noise + margin + templates.student.length + msToFrames(15);
+  recordAt(ownSlot - margin - frames.noise, length, function (samples) {
+    if (samples !== null) {
+      loud.own.push(chirpLoudness(samples, frames.noise));
+      showLoudness();
+    }
+  });
+  recordAt(partnerSlot - margin - frames.noise, length, function (samples) {
+    if (samples !== null) {
+      loud.partner.push(chirpLoudness(samples, frames.noise));
+      showLoudness();
+    }
+  });
+}
+
+// How loud is the student chirp in this recording? Returns
+// { amplitude, snr }: amplitude 1 = as loud as the stored chirp shape;
+// snr = how many times above the background noise (as in countChirps).
+function chirpLoudness(samples, noiseFrames) {
+  const sine = templates.student;
+  const cosine = templates.studentCos;
+  const m = sine.length;
+
+  let noiseEnergy = 0;
+  for (let i = 0; i < noiseFrames; i++) {
+    noiseEnergy = noiseEnergy + samples[i] * samples[i];
+  }
+  const noiseLevel = Math.sqrt(noiseEnergy / noiseFrames) + 1e-9;
+
+  let templateEnergy = 0;
+  for (let i = 0; i < m; i++) {
+    templateEnergy = templateEnergy + sine[i] * sine[i];
+  }
+
+  let best = 0;
+  for (let shift = noiseFrames; shift + m <= samples.length; shift++) {
+    let sineMatch = 0;
+    let cosineMatch = 0;
+    for (let i = 0; i < m; i++) {
+      sineMatch = sineMatch + samples[shift + i] * sine[i];
+      cosineMatch = cosineMatch + samples[shift + i] * cosine[i];
+    }
+    best = Math.max(best, Math.sqrt(sineMatch * sineMatch + cosineMatch * cosineMatch));
+  }
+  // If the recording holds  a * (chirp shape), the best match is about a * templateEnergy.
+  return {
+    amplitude: best / templateEnergy,
+    snr: best / (noiseLevel * Math.sqrt(templateEnergy))
+  };
+}
+
+function toDb(ratio) {
+  return 20 * Math.log10(Math.max(ratio, 1e-9));
+}
+
+function showLoudness() {
+  // Keep only the last 5 of each, and show their middle values (median).
+  if (loud.own.length > 5) { loud.own.shift(); }
+  if (loud.partner.length > 5) { loud.partner.shift(); }
+  if (loud.own.length === 0 || loud.partner.length === 0) {
+    return;
+  }
+  const ownAmps = [], ownSnrs = [], partnerAmps = [], partnerSnrs = [];
+  for (let i = 0; i < loud.own.length; i++) {
+    ownAmps.push(loud.own[i].amplitude);
+    ownSnrs.push(loud.own[i].snr);
+  }
+  for (let i = 0; i < loud.partner.length; i++) {
+    partnerAmps.push(loud.partner[i].amplitude);
+    partnerSnrs.push(loud.partner[i].snr);
+  }
+  const ownAmp = median(ownAmps);
+  const partnerAmp = median(partnerAmps);
+  // MIN_SNR as a dB value, for comparison: a neighbour needs at least this.
+  document.getElementById('loudResult').textContent =
+    'I am ' + loud.role + ' (median of last ' + loud.own.length + ')\n' +
+    'Own chirp:     SNR ' + toDb(median(ownSnrs)).toFixed(1) + ' dB\n' +
+    'Partner chirp: SNR ' + toDb(median(partnerSnrs)).toFixed(1) + ' dB' +
+    '  (neighbour counting needs ' + toDb(MIN_SNR).toFixed(1) + ' dB)\n' +
+    'Partner vs own: ' + toDb(partnerAmp / ownAmp).toFixed(1) + ' dB';
+}
+
+// ---- the "chirps heard" display ----
+// count = number heard, or null if the cell fired and did not listen.
+function showDetection(count) {
+  if (!settings.expert) {
+    return;
+  }
+  const box = document.getElementById('detectBox');
+  if (count === null) {
+    document.getElementById('detectCount').textContent = 'fired';
+    document.getElementById('detectDots').textContent = '';
+    document.getElementById('detectInfo').textContent = '(not listening on this tick)';
+    expert.history.push('F');
+  } else {
+    document.getElementById('detectCount').textContent = String(count);
+    let dots = '';
+    for (let i = 0; i < count; i++) {
+      dots = dots + '●';
+    }
+    document.getElementById('detectDots').textContent = dots;
+    document.getElementById('detectInfo').textContent =
+      'strongest match: SNR ' + lastDetection.strongestSnr.toFixed(1) + ' (needs ' + MIN_SNR + ')';
+    expert.history.push(String(count));
+    if (count > 0) {
+      box.classList.add('heard');
+      setTimeout(function () { box.classList.remove('heard'); }, 300);
+    }
+  }
+  if (expert.history.length > 20) {
+    expert.history.shift();
+  }
+  document.getElementById('detectHistory').textContent =
+    'last ticks (F = fired): ' + expert.history.join(' ');
+}
+
+// ---- tuning controls ----
+function showTuningValues() {
+  document.getElementById('thresholdVal').textContent = settings.threshold;
+  document.getElementById('minSnrVal').textContent = MIN_SNR;
+  document.getElementById('gainVal').textContent = settings.gain;
+}
+
+function onTuningChange() {
+  settings.threshold = parseFloat(document.getElementById('thresholdSlider').value);
+  MIN_SNR = parseFloat(document.getElementById('minSnrSlider').value);
+  settings.gain = parseFloat(document.getElementById('gainSlider').value);
+  showTuningValues();
+}
+
+function onRadiusChange() {
+  const old = settings.radiusM;
+  settings.radiusM = parseFloat(document.getElementById('radiusSelect').value);
+  const problem = checkSettings(settings);
+  if (problem !== '') {
+    log(problem);
+    settings.radiusM = old;
+    document.getElementById('radiusSelect').value = String(old);
+    return;
+  }
+  computeFrames();
+  log('Listening window: neighbours up to ' + settings.radiusM + ' m');
+}
+
+function onChirpLengthChange() {
+  const old = settings.chirpMs;
+  settings.chirpMs = parseFloat(document.getElementById('chirpSelect').value);
+  const problem = checkSettings(settings);
+  if (problem !== '') {
+    log(problem);
+    settings.chirpMs = old;
+    document.getElementById('chirpSelect').value = String(old);
+    return;
+  }
+  makeTemplates();   // new chirp shapes, also sent to the worklet
+  log('Student chirp length: ' + settings.chirpMs + ' ms (set the same on every phone)');
+}
+
+function resetCell() {
+  sim.state = {};
+  sim.fireNext = false;
+  sim.pressed = {};
+  try {
+    if (sim.cell && sim.cell.start) {
+      sim.cell.start(sim.state, readCellSettings());
+    }
+  } catch (error) {
+    log('Error in the cell file (start): ' + error.message);
+  }
+  log('Cell reset');
+}
+
+// ---- expert buttons ----
+document.getElementById('clockSelect').addEventListener('change', function () {
+  setClockSource(document.getElementById('clockSelect').value);
+});
+document.getElementById('referenceBtn').addEventListener('click', onReference);
+document.getElementById('getTimeBtn').addEventListener('click', onGetTime);
+document.getElementById('forgetBtn').addEventListener('click', onForget);
+document.getElementById('beaconBtn').addEventListener('click', function () {
+  setBeacon(!expert.beacon);
+});
+document.getElementById('actInstructorBtn').addEventListener('click', function () {
+  setActInstructor(!expert.actInstructor);
+});
+document.getElementById('loudABtn').addEventListener('click', function () { startLoudnessTest('A'); });
+document.getElementById('loudBBtn').addEventListener('click', function () { startLoudnessTest('B'); });
+document.getElementById('loudStopBtn').addEventListener('click', stopLoudnessTest);
+document.getElementById('thresholdSlider').addEventListener('input', onTuningChange);
+document.getElementById('minSnrSlider').addEventListener('input', onTuningChange);
+document.getElementById('gainSlider').addEventListener('input', onTuningChange);
+document.getElementById('radiusSelect').addEventListener('change', onRadiusChange);
+document.getElementById('chirpSelect').addEventListener('change', onChirpLengthChange);
+document.getElementById('resetCellBtn').addEventListener('click', resetCell);
+
+
+applyAddressSettings();
+document.getElementById('studentBtn').addEventListener('click', function () {
+  requestMotionPermission(); // must happen inside the tap, before anything waits
+  startStudent();
+});
+document.getElementById('instructorBtn').addEventListener('click', startInstructor);
+document.getElementById('syncHereBtn').addEventListener('click', onSyncHere);
+document.getElementById('seatedBtn').addEventListener('click', onSeated);
+document.getElementById('neighbourBtn').addEventListener('click', startNeighbourSync);
+document.getElementById('runBtn').addEventListener('click', onRun);
+window.addEventListener('devicemotion', onMotion);
+</script>
+</body>
+</html>
