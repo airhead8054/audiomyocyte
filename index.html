@@ -1370,6 +1370,7 @@ async function startStudent() {
   const problem = checkSettings(settings);
   if (problem !== '') {
     log(problem);
+    disableRoleButtons();
     return;
   }
   disableRoleButtons();
