@@ -10,5 +10,5 @@
 | "Heard only 0–2 sync chirps" | Partner phone not synced, or beacon off, or too far apart | Check the partner's dot is green and its beacon is on; hold the phones a few cm apart |
 | Clock test warns about the window edge | The clocks drifted more than about 20 ms apart | Re-sync and restart the test |
 | Edit doesn't show on the phone | GitHub Pages still updating, or the phone kept the old copy | Wait 2 minutes, reload; check the Actions tab |
-| My pushed changes were not displayed | Browser caching old version of website | Clear browser cache |
+| My pushed changes were not displayed | Browser caching old version of website | Clear browser cache, or add &v=2 to the end of the address for a fresh copy |
 | "Sync here" needs the clock set to "Follow instructor chirps". | Clock is not set to "Follow instructor chirps" for expert mode | Change setting for clock to "Follow instructor chirps" |
