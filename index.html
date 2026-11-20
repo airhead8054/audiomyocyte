@@ -1376,6 +1376,8 @@ async function startStudent() {
     const ok = await measureLoopback();
     if (!ok) {
       log('Could not hear our own chirps. Turn the volume up and reload the page.');
+      document.getElementById('studentBtn').disabled = false;
+      document.getElementById('studentBtn').innerHTML = "Retry";
       return;
     }
     // The own chirp must be booked after the instructor chirp is processed
