@@ -1370,7 +1370,7 @@ async function startStudent() {
   const problem = checkSettings(settings);
   if (problem !== '') {
     log(problem);
-    disableRoleButtons();
+    retryButtonsAsStudent();
     return;
   }
   disableRoleButtons();
@@ -1384,7 +1384,7 @@ async function startStudent() {
     const ok = await measureLoopback();
     if (!ok) {
       log('Could not hear our own chirps. Turn the volume up and reload the page.');
-      retryButtonsAsStudent()
+      retryButtonsAsStudent();
       return;
     }
     // The own chirp must be booked after the instructor chirp is processed
@@ -1477,7 +1477,7 @@ function setupExpertMode() {
   document.getElementById('chirpSelect').value = String(settings.chirpMs);
   showTuningValues();
 
-  document.getElementById('clockSelect').value = 'instructor';
+  document.getElementById('clockSelect').value = 'own';
   setClockSource('own');
   log('Expert mode. Own clock: one phone taps "Be the reference clock".');
 }
