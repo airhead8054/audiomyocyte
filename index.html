@@ -1396,6 +1396,8 @@ async function startStudent() {
     }
   } catch (error) {
     log('ERROR: ' + error);
+    document.getElementById('studentBtn').disabled = false;
+    document.getElementById('studentBtn').innerHTML = "Retry";
   }
 }
 
