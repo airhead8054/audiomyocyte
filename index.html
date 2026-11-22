@@ -1289,9 +1289,7 @@ function runTick(tick) {
     if (samples !== null) {
       count = countChirps(samples, templates.run, templates.runCos, frames.noise);
     }
-    if (count) {
-      log(count);
-    }
+    log("Count of runs heard: " + count);
   });
 }
 
