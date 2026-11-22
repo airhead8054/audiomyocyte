@@ -1371,10 +1371,6 @@ function updateScreen() {
   document.getElementById('status').textContent = text;
 }
 
-function makeInstructorButtonsVisible() {
-  document.getElementsByClassName('instructorCard').hidden = false;
-}
-
 function disableRoleButtons() {
   document.getElementById('studentBtn').disabled = true;
   document.getElementById('instructorBtn').disabled = true;
@@ -1450,6 +1446,7 @@ async function startInstructor() {
     bookInstructorChirps();
     setInterval(bookInstructorChirps, 250);
     setInterval(updateScreen, 250);
+    document.getElementsById('instructorCard').hidden = false;
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsInstructor();
