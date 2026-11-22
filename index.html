@@ -1875,6 +1875,18 @@ function resetCell() {
   log('Cell reset');
 }
 
+// ---- functions for instructor buttons ----
+function instructorRun() {
+  playAt(nowFrame(), 'run', INSTRUCTOR_GAIN);
+}
+
+function instructorPause() {
+  playAt(nowFrame(), 'pause', INSTRUCTOR_GAIN);
+}
+function instructorReset() {
+  playAt(nowFrame(), 'reset', INSTRUCTOR_GAIN);
+}
+
 // ---- expert buttons ----
 document.getElementById('clockSelect').addEventListener('change', function () {
   setClockSource(document.getElementById('clockSelect').value);
@@ -1910,6 +1922,11 @@ document.getElementById('seatedBtn').addEventListener('click', onSeated);
 document.getElementById('neighbourBtn').addEventListener('click', startNeighbourSync);
 document.getElementById('runBtn').addEventListener('click', onRun);
 window.addEventListener('devicemotion', onMotion);
+
+// ---- instructor buttons ----
+document.getElementById('instructorRunBtn').addEventListener('click', instructorRun);
+document.getElementById('instructorPauseBtn').addEventListener('click', instructorPause);
+document.getElementById('instructorResetBtn').addEventListener('click', instructorReset);
 </script>
 </body>
 </html>
