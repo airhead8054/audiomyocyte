@@ -72,6 +72,8 @@
   <span id="dot"></span><span id="status">Not started</span>
 </div>
 
+
+<!-- ==== BUTTONS FOR STUDENT ==== -->
 <div class="card" id="syncCard" hidden>
   <button id="syncHereBtn">Sync here (phone right next to the instructor speaker)</button>
   <button id="seatedBtn">I'm seated</button>
@@ -148,6 +150,13 @@
   <button id="runBtn">Run simulation</button>
   <button id="resetCellBtn" hidden>Reset cell (start from resting)</button>
   <div id="cellControls"></div>
+</div>
+
+<!-- ==== BUTTONS FOR INSTRUCTOR ==== -->
+<div class="card" id="instructorCard" hidden>
+  <button id="instructorRunBtn">Run simulation</button>
+  <button id="instructorPauseBtn">Pause simulation</button>
+  <button id="instructorResetBtn">Reset cells</button>
 </div>
 
 <h3>Log</h3>
@@ -1362,6 +1371,10 @@ function updateScreen() {
   document.getElementById('status').textContent = text;
 }
 
+function makeInstructorButtonsVisible() {
+  document.getElementById('instructorCard').visible = false;
+}
+
 function disableRoleButtons() {
   document.getElementById('studentBtn').disabled = true;
   document.getElementById('instructorBtn').disabled = true;
@@ -1429,6 +1442,7 @@ async function startInstructor() {
   role = 'instructor';
   try {
     await startAudio(false);
+    makeInstructorButtonsVisible()
     computeFrames();
     makeTemplates();
     document.body.style.background = '#0b2a4a';
