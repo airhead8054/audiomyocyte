@@ -1446,7 +1446,7 @@ async function startInstructor() {
     bookInstructorChirps();
     setInterval(bookInstructorChirps, 250);
     setInterval(updateScreen, 250);
-    document.getElementsById('instructorCard').hidden = false;
+    document.getElementById('instructorCard').hidden = false;
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsInstructor();
