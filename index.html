@@ -1365,6 +1365,13 @@ function makeRetryButtonsAsStudent() {
   document.getElementById('instructorBtn').innerHTML = "Start as Instructor instead"
 }
 
+function makeRetryButtonsAsInstructor() {
+  document.getElementById('studentBtn').disabled = false;
+  document.getElementById('instructorBtn').disabled = false;
+  document.getElementById('studentBtn').innerHTML = "Start as Student Instead";
+  document.getElementById('instructorBtn').innerHTML = "Retry"
+}
+
 async function startStudent() {
   settings = readSettings();
   const problem = checkSettings(settings);
@@ -1422,6 +1429,7 @@ async function startInstructor() {
     setInterval(updateScreen, 250);
   } catch (error) {
     log('ERROR: ' + error);
+    makeRetryButtonsAsInstructor()
   }
 }
 
