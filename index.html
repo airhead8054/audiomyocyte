@@ -1275,15 +1275,22 @@ function runTick(tick) {
   }
   recordAt(start, length, function (samples) {
     let count = 0;
-    let runCount = 0;
     if (samples !== null) {
       count = countChirps(samples, templates.student, templates.studentCos, frames.noise);
-      runCount = countChirps(samples, templates.run, templates.runCos, frames.noise);
     }
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
-    if (runCount) {
-      log("runCount: " + runCount);
+  });
+  // detection for instructor commands
+  let run_start = tick.frame - frames.before - frames.noise;
+  let run_length = frames.noise + 2 * frames.before + frames.radius + templates.run.length;
+  recordAt(start, length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
+    }
+    if (count) {
+      log(count);
     }
   });
 }
