@@ -1877,14 +1877,14 @@ function resetCell() {
 
 // ---- functions for instructor buttons ----
 function instructorRun() {
-  playAt(nowFrame(), 'run', INSTRUCTOR_GAIN);
+  playAt(nowFrame() + 1, 'run', INSTRUCTOR_GAIN);
 }
 
 function instructorPause() {
-  playAt(nowFrame(), 'pause', INSTRUCTOR_GAIN);
+  playAt(nowFrame() + 1, 'pause', INSTRUCTOR_GAIN);
 }
 function instructorReset() {
-  playAt(nowFrame(), 'reset', INSTRUCTOR_GAIN);
+  playAt(nowFrame() + 1, 'reset', INSTRUCTOR_GAIN);
 }
 
 // ---- expert buttons ----
