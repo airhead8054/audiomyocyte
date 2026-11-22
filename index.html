@@ -1275,11 +1275,16 @@ function runTick(tick) {
   }
   recordAt(start, length, function (samples) {
     let count = 0;
+    let runCount = 0;
     if (samples !== null) {
       count = countChirps(samples, templates.student, templates.studentCos, frames.noise);
+      runCount = countChirps(samples, templates.run, templates.runCos, frames.noise);
     }
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
+    if (runCount) {
+      log("runCount: " + runCount);
+    }
   });
 }
 
