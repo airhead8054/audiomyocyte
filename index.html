@@ -272,6 +272,7 @@ const SYNC_GAIN = 0.2;          // quiet: the two phones are touching
 const SYNC_CHIRPS = 5;          // sync chirps a synced phone plays after a shake
 const SHAKE_ACCELERATION = 15;  // m/s² (without gravity) that counts as a shake
 const MAX_MISSES = 3;           // missed instructor chirps in a row before we give up
+const INSTRUCTOR_COMMAND_BUFFER = 4800; // frames, the amount of frames that would buffer between instructor commands and normal chirping. Default 100ms, msToFrames(100)
 
 const SETTING_NAMES = ['periodMs', 'chirpMs', 'instructorChirpMs', 'gain', 'radiusM', 'threshold', 'maxRoomM'];
 let settings = null;
@@ -1877,14 +1878,35 @@ function resetCell() {
 
 // ---- functions for instructor buttons ----
 function instructorRun() {
-  playAt(nowFrame() + 10, 'run', INSTRUCTOR_GAIN);
+  let now_frame = nowFrame();
+  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
+  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
+  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
+  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
+    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
+  }
+  playAt(play_frame, 'run', INSTRUCTOR_GAIN);
 }
 
 function instructorPause() {
-  playAt(nowFrame() + 10, 'pause', INSTRUCTOR_GAIN);
+  let now_frame = nowFrame();
+  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
+  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
+  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
+  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
+    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
+  }
+  playAt(play_frame, 'pause', INSTRUCTOR_GAIN);
 }
 function instructorReset() {
-  playAt(nowFrame() + 10, 'reset', INSTRUCTOR_GAIN);
+  let now_frame = nowFrame();
+  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
+  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
+  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
+  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
+    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
+  }
+  playAt(play_frame, 'reset', INSTRUCTOR_GAIN);
 }
 
 // ---- expert buttons ----
