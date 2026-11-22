@@ -400,16 +400,25 @@ function makeUpDown(lowHz, highHz, durationMs, sampleRate) {
   return wave;
 }
 
-const templates = { student: null, studentCos: null, instructor: null, sync: null };
+const templates = { student: null, studentCos: null, instructor: null, sync: null, run: null, pause: null, reset: null };
 
 function makeTemplates() {
   templates.student = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate);
   templates.studentCos = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate, true);
   templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
+
+  //instructor commands
+  templates.run = makeSweep(6000, 9000, settings.instructorChirpMs, audio.sampleRate);
+  templates.pause = makeSweep(9000, 6000, settings.instructorChirpMs, audio.sampleRate);
+  templates.reset = makeSweep(6000, 9000, settings.instructorChirpMs, audio.sampleRate, true);
+
   sendWaveform('student', templates.student);
   sendWaveform('instructor', templates.instructor);
   sendWaveform('sync', templates.sync);
+  sendWaveform('run', templates.run);
+  sendWaveform('pause', templates.pause);
+  sendWaveform('reset', templates.reset);
 }
 
 
