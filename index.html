@@ -418,10 +418,13 @@ function makeTemplates() {
   templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
 
-  //instructor commands
+  // instructor commands
   templates.run = makeSweep(6000, 9000, settings.instructorChirpMs, audio.sampleRate);
+  templates.runCos = makeSweep(6000, 9000, settings.instructorChirpMs, audio.sampleRate, true);
   templates.pause = makeSweep(9000, 6000, settings.instructorChirpMs, audio.sampleRate);
-  templates.reset = makeSweep(6000, 9000, settings.instructorChirpMs, audio.sampleRate, true);
+  templates.pauseCos = makeSweep(9000, 6000, settings.instructorChirpMs, audio.sampleRate, true);
+  templates.reset = makeSweep(9500, 12500, settings.instructorChirpMs, audio.sampleRate);
+  templates.resetCos = makeSweep(12500, 9500, settings.instructorChirpMs, audio.sampleRate, true);
 
   sendWaveform('student', templates.student);
   sendWaveform('instructor', templates.instructor);
