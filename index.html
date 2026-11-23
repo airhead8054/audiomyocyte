@@ -830,7 +830,7 @@ function listenForRun() {
   }
   recordAt(start, length, function(samples, startFrame) {
     let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
-    log(count);
+    if (count >= 1) log("hi");
     listenForRun();
   });
 }
