@@ -830,10 +830,10 @@ function listenForRun() {
   }
   recordAt(start, length, function(samples, startFrame) {
     if (samples !== null) {
-      let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
-      //const peak = strongestPeak(correlate(samples, templates.run));
-      if (count >= 1) log("hi");
-      //if (peak.value >= settings.threshold) log("hi");
+      //let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
+      const peak = strongestPeak(correlate(samples, templates.run));
+      //if (count >= 1) log("hi");
+      if (peak.value >= settings.threshold) log("hi");
     }
     listenForRun();
   });
