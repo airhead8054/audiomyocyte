@@ -821,6 +821,7 @@ function listenForInstructor() {
 }
 
 function listenForRun() {
+  const earliest = nowFrame() + msToFrames(20);
   let start = null;
   let length = 0;
   if (start === null || start < earliest) {
