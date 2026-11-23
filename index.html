@@ -833,7 +833,8 @@ function listenForRun() {
       //let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
       const peak = strongestPeak(correlate(samples, templates.run));
       //if (count >= 1) log("hi");
-      if (peak.value >= settings.threshold) log("hi");
+      log("Peak: " + peak.value + ", Expected: " + settings.threshold + ".");
+      if (peak.value >= settings.threshold) log("=====FIRE!=====");
     }
     listenForRun();
   });
