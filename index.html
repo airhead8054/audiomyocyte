@@ -820,6 +820,20 @@ function listenForInstructor() {
   recordAt(start, length, onInstructorWindow);
 }
 
+function listenForRun() {
+  let start = null;
+  let length = 0;
+  if (start === null || start < earliest) {
+    start = earliest;
+    length - frames.period + templates.run.length;
+  }
+  recordAt(start, length, function(samples, startFrame) {
+    let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
+    log(count);
+    listenForRun();
+  });
+}
+
 function onInstructorWindow(samples, startFrame) {
   // EXPERT MODE: the clock was switched to "own" while we were recording.
   if (clockSource !== 'instructor') {
@@ -1430,6 +1444,7 @@ async function startStudent() {
     } else {
       listenForInstructor();
     }
+    listenForRun();
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsStudent();
