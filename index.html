@@ -1281,16 +1281,6 @@ function runTick(tick) {
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
   });
-  // detection for instructor commands
-  let run_start = tick.frame - frames.before - frames.noise;
-  let run_length = frames.noise + 2 * frames.before + frames.radius + templates.run.length;
-  recordAt(start, length, function (samples) {
-    let count = 0;
-    if (samples !== null) {
-      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
-    }
-    log("Count of runs heard: " + count);
-  });
 }
 
 function stepCell(neighbours) {
