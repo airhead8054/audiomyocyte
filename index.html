@@ -830,13 +830,44 @@ function listenForRun() {
   }
   recordAt(start, length, function(samples, startFrame) {
     if (samples !== null) {
-      //let count = countChirps(samples, templates.run, templates.runCos, frames.noise);
       const peak = strongestPeak(correlate(samples, templates.run));
-      //if (count >= 1) log("hi");
-      log("Peak: " + peak.value + ", Expected: " + settings.threshold + ".");
-      if (peak.value >= settings.threshold) log("=====FIRE!=====");
+      if (peak.value >= settings.threshold) log("=====RUN!=====");
     }
     listenForRun();
+  });
+}
+
+function listenForPause() {
+  const earliest = nowFrame() + msToFrames(20);
+  let start = null;
+  let length = 0;
+  if (start === null || start < earliest) {
+    start = earliest;
+    length = frames.period + templates.pause.length;
+  }
+  recordAt(start, length, function(samples, startFrame) {
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.pause));
+      if (peak.value >= settings.threshold) log("=====PAUSE!=====");
+    }
+    listenForPause();
+  });
+}
+
+function listenForReset() {
+  const earliest = nowFrame() + msToFrames(20);
+  let start = null;
+  let length = 0;
+  if (start === null || start < earliest) {
+    start = earliest;
+    length = frames.period + templates.reset.length;
+  }
+  recordAt(start, length, function(samples, startFrame) {
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.reset));
+      if (peak.value >= settings.threshold) log("=====RESET!=====");
+    }
+    listenForReset();
   });
 }
 
@@ -1451,6 +1482,8 @@ async function startStudent() {
       listenForInstructor();
     }
     listenForRun();
+    listenForPause();
+    listenForReset();
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsStudent();
