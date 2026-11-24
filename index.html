@@ -785,11 +785,14 @@ function bookInstructorChirps() {
   while (instructorClock.nextChirpFrame < bookUntil) {
     playAt(instructorClock.nextChirpFrame, 'instructor', INSTRUCTOR_GAIN);
     flashAtFrame(instructorClock.nextChirpFrame);
-    
+
     // for instructor commands
     if (run_pressed) {
       run_pressed = false;
       let play_time = instructorClock.nextChirpFrame + frames.quarter;
+      while (play_time - msToFrames(1000) > nowFrame()) {
+        play_time -= msToFrames(1000);
+      }
       playAt(play_time, 'run', INSTRUCTOR_GAIN);
       log("Playing command \'run\' at " + play_time +'!');
     }
