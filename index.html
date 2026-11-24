@@ -338,7 +338,6 @@ function computeFrames() {
 // variables for instructor commands
 
 let instructor_command = '';
-let command_run_received = false;
 
 function log(text) {
   const box = document.getElementById('log');
@@ -791,6 +790,7 @@ function bookInstructorChirps() {
   // for instructor commands
   if (instructor_command !== '') {
     let play_time = instructorClock.nextChirpFrame + frames.quarter;
+    // remove the 3 second delay introduced by the previous while loop
     while (play_time - msToFrames(1000) > nowFrame()) {
       play_time -= msToFrames(1000);
     }
@@ -1259,6 +1259,45 @@ function runTick(tick) {
   if (loud.role !== '') {
     return; // the loudness test uses the ticks instead of the simulation
   }
+  // instructor command audio processing
+  if (!tick.reliable) {
+    command_start -= frames.maxDistance;
+    command_length += frames.maxDistance;
+  }
+  // instructor commands
+  recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.run));
+      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
+      if (peak.value >= settings.threshold) {
+        sim.running = true;
+        document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
+        log('Simulation is now running.');
+      }
+      
+    }
+  });
+  recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.pause));
+      count = countChirps(samples, templates.pause, templates.pauseCos, frames.noise);
+      if (peak.value >= settings.threshold) {
+        sim.running = false;
+        document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
+        log('Simulation is now paused.');
+      };
+    }
+  });
+  recordAt(command_start, command_length_incomplete + templates.reset.length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.reset));
+      count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
+      if (peak.value >= settings.threshold) log('======RESET!======');
+    }
+  });
   if (!sim.running || sim.cell === null) {
     return;
   }
@@ -1291,8 +1330,6 @@ function runTick(tick) {
     // PITFALL: the longer window also lets in neighbours from farther away.
     start = start - frames.maxDistance;
     length = length + frames.maxDistance;
-    command_start -= frames.maxDistance;
-    command_length += frames.maxDistance;
   }
   recordAt(start, length, function (samples) {
     let count = 0;
@@ -1302,31 +1339,6 @@ function runTick(tick) {
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
   });
-  // instructor commands
-  recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
-    let count = 0;
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.run));
-      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
-      command_run_received = peak.value >= settings.threshold;
-    }
-  });
-  recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
-    let count = 0;
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.pause));
-      count = countChirps(samples, templates.pause, templates.pauseCos, frames.noise);
-      if (peak.value >= settings.threshold) log('======PAUSE!======');
-    }
-  });
-  recordAt(command_start, command_length_incomplete + templates.reset.length, function (samples) {
-    let count = 0;
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.reset));
-      count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
-      if (peak.value >= settings.threshold) log('======RESET!======');
-    }
-  });
 }
 
 function stepCell(neighbours) {
@@ -1334,11 +1346,6 @@ function stepCell(neighbours) {
   sim.pressed = {};
   let result = null;
   try {
-    if (command_run_received) {
-      input.pressed.stimulate = true;
-      log(input.pressed.stimulate);
-      command_run_received = false;
-    }
     result = sim.cell.step(sim.state, input, readCellSettings());
   } catch (error) {
     log('Error in the cell file (step): ' + error.message);
