@@ -785,8 +785,7 @@ function bookInstructorChirps() {
   while (instructorClock.nextChirpFrame < bookUntil) {
     playAt(instructorClock.nextChirpFrame, 'instructor', INSTRUCTOR_GAIN);
     flashAtFrame(instructorClock.nextChirpFrame);
-    instructorClock.nextChirpFrame = instructorClock.nextChirpFrame + frames.period;
-
+    
     // for instructor commands
     if (run_pressed) {
       run_pressed = false;
@@ -794,6 +793,10 @@ function bookInstructorChirps() {
       playAt(play_time, 'run', INSTRUCTOR_GAIN);
       log("Playing command \'run\' at " + play_time +'!');
     }
+
+    instructorClock.nextChirpFrame = instructorClock.nextChirpFrame + frames.period;
+
+    
   }
 }
 
