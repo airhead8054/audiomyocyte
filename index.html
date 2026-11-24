@@ -373,10 +373,13 @@ function wrapToPeriod(n) {
 // =====================================================================
 // 3. CHIRP SHAPES
 // =====================================================================
-// Three different shapes, so a phone always knows what it is hearing:
+// Six different shapes, so a phone always knows what it is hearing:
 //   student:    rising sweep 2.5 -> 5.5 kHz
 //   instructor: falling sweep 5.5 -> 2.5 kHz
 //   sync:       up then down (only used when shaking phones together)
+//   run:        rising sweep 6.0 -> 9.0 kHz
+//   pause:      falling sweep 9.0 -> 6.0 kHz
+//   reset:      rising sweep 9.5 -> 12.5 kHz
 
 // useCosine = true makes the same sweep with cos() instead of sin(): a copy
 // shifted by a quarter of a wave. Used by countChirps (part 4).
