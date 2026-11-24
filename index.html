@@ -39,6 +39,7 @@
          font-size: 13px; white-space: pre-wrap; }
   button.on { background: #0a5a2a; border-color: #2ecc40; }
   select { font-size: 17px; padding: 4px; }
+  #monitorCanvas { width: 100vw; height: 50vh }
 </style>
 </head>
 <body>
@@ -159,6 +160,12 @@
   <button id="instructorResetBtn">Reset cells</button>
 </div>
 
+<!-- ==== MONITOR ==== -->
+<div class="card" id="monitorCard" hidden>
+  <canvas id="monitorCanvas"></canvas>
+  <button id="monitorStartBtn">Start Monitor</button>
+</div>
+
 <h3>Log</h3>
 <div id="log"></div>
 
@@ -198,6 +205,7 @@
 //   11. The simulation and the cell file
 //   12. Screen and buttons
 //   13. Small group / expert mode (new in v2.6)
+//   14. Monitor of student chirps (only activation for now)
 //
 //  EXPERT MODE (v2.6), for about 10 students who know what they are doing.
 //  Turn it on in Settings or with ?expert=1. It adds:
@@ -775,6 +783,7 @@ async function tryLoopback() {
 // tick is half a period before each instructor chirp. It does not listen.
 
 const instructorClock = { nextChirpFrame: 0 };
+const monitorClock = { nextTick: 0 };
 
 function bookInstructorChirps() {
   // Keep chirps booked 3 s ahead.
@@ -1270,10 +1279,8 @@ function runTick(tick) {
   }
   // instructor commands
   recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
-    let count = 0;
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.run));
-      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
       if (peak.value >= settings.threshold) {
         sim.running = true;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
@@ -1283,10 +1290,8 @@ function runTick(tick) {
     }
   });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
-    let count = 0;
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.pause));
-      count = countChirps(samples, templates.pause, templates.pauseCos, frames.noise);
       if (peak.value >= settings.threshold) {
         sim.running = false;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
@@ -1295,10 +1300,8 @@ function runTick(tick) {
     }
   });
   recordAt(command_start, command_length_incomplete + templates.reset.length, function (samples) {
-    let count = 0;
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.reset));
-      count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
       if (peak.value >= settings.threshold) {
         resetCell();
         log('Reset cell due to instructor command.');
@@ -1505,11 +1508,14 @@ async function startInstructor() {
     computeFrames();
     makeTemplates();
     document.body.style.background = '#0b2a4a';
-    instructorClock.nextChirpFrame = nowFrame() + msToFrames(500);
+    const now = nowFrame();
+    instructorClock.nextChirpFrame = now + msToFrames(500);
+    monitorClock.nextTick = now;
     bookInstructorChirps();
     setInterval(bookInstructorChirps, 250);
     setInterval(updateScreen, 250);
     document.getElementById('instructorCard').hidden = false;
+    document.getElementById('monitorCard').hidden = false;
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsInstructor();
@@ -1883,6 +1889,72 @@ function showDetection(count) {
     'last ticks (F = fired): ' + expert.history.join(' ');
 }
 
+// =====================================================================
+// 14. MONITOR OF STUDENT CHIRPS (only activation for now)
+// =====================================================================
+
+// clocks for audio listening
+
+function monitorClockLoop() {
+  const lead = Math.round(frames.period * 0.2);
+  const now = nowFrame();
+  if (now < monitorClock.nextTick - lead) {
+    return; // not yet
+  }
+  if (now > monitorClock.nextTick - msToFrames(20)) {
+    // We are too late for this tick (the page was busy or in the background):
+    // skip ahead.
+    log('Monitor clock: a tick was skipped (page too slow)');
+    monitorClock.nextTick = monitorClock.nextTick + frames.period;
+    return;
+  }
+  // listen for student chirps
+  // PITFALL: may only be able to process one student chirp at a time (the lastest)
+  let start = monitorClock.nextTick - frames.before - frames.noise;
+  let length = frames.noise + 2* frames.before + frames.maxDistance + templates.student.length;
+  recordAt(start, length, function (samples) {
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.student));
+      if (peak.value >= settings.threshold) {
+        log("=====STUDENT CHIRP=====");
+      }
+    }
+  });
+  monitorClock.nextTick = monitorClock.nextTick + frames.period;
+}
+
+// monitor canvas
+const monitorCanvas = document.getElementById('monitorCanvas');
+const mctx = monitorCanvas.getContext('2d');
+
+function renderMonitorCanvas() {
+  // render background
+  mctx.fillStyle = '#777777';
+  mctx.fillRect(0, 0, monitorCanvas.width, monitorCanvas.height);
+}
+
+function updateMonitorCanvas() {
+  // update canvas size based on window size
+  if (monitorCanvas.clientWidth) {
+    document.getElementById('monitorCanvas').width = monitorCanvas.clientWidth;
+  }
+  if (monitorCanvas.clientHeight) {
+    document.getElementById('monitorCanvas').height = monitorCanvas.clientHeight;
+  }
+  renderMonitorCanvas();
+}
+
+async function startMonitor() {
+  try {
+    await startAudio(true);
+    monitor_clock = setInterval(monitorClockLoop, 20);
+    document.getElementById('monitorStartBtn').disabled = true;
+    setInterval(updateMonitorCanvas, 250);
+  } catch (error) {
+    log('Error in startMonitor: ' + error.message);
+  }
+}
+
 // ---- tuning controls ----
 function showTuningValues() {
   document.getElementById('thresholdVal').textContent = settings.threshold;
@@ -1994,6 +2066,9 @@ window.addEventListener('devicemotion', onMotion);
 document.getElementById('instructorRunBtn').addEventListener('click', instructorRun);
 document.getElementById('instructorPauseBtn').addEventListener('click', instructorPause);
 document.getElementById('instructorResetBtn').addEventListener('click', instructorReset);
+
+// ---- monitor ----
+document.getElementById('monitorStartBtn').addEventListener('click', startMonitor);
 </script>
 </body>
 </html>
