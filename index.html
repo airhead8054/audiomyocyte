@@ -1318,11 +1318,16 @@ function runTick(tick) {
   // NOISE_MS earlier still, to measure the background noise (see countChirps).
   let start = tick.frame - frames.before - frames.noise;
   let length = frames.noise + 2 * frames.before + frames.radius + templates.student.length;
+  // listen for instructor commands too
+  let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
+  let command_length = frames.noise + 2* frames.before + frames.maxDistance + templates.run.length;
   if (!tick.reliable) {
     // Not synced: our tick may be up to the room size late, so listen earlier.
     // PITFALL: the longer window also lets in neighbours from farther away.
     start = start - frames.maxDistance;
     length = length + frames.maxDistance;
+    command_start -= frames.maxDistance;
+    command_length += frames.maxDistance;
   }
   recordAt(start, length, function (samples) {
     let count = 0;
@@ -1332,6 +1337,13 @@ function runTick(tick) {
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
   });
+  recordAt(command_start, command_length, function (samples) {
+    if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.run));
+      if (peak.value >= settings.threshold) log("=====RUN!=====");
+    }
+  });
+  
 }
 
 function stepCell(neighbours) {
@@ -1481,9 +1493,9 @@ async function startStudent() {
     } else {
       listenForInstructor();
     }
-    listenForRun();
-    listenForPause();
-    listenForReset();
+    // listenForRun();
+    // listenForPause();
+    // listenForReset();
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsStudent();
@@ -1935,14 +1947,15 @@ function resetCell() {
 
 // ---- functions for instructor buttons ----
 function instructorRun() {
-  let now_frame = nowFrame();
-  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
-  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
-  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
-  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
-    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
-  }
-  playAt(play_frame, 'run', INSTRUCTOR_GAIN);
+  // let now_frame = nowFrame();
+  // // time buffer between normal chirps and instructor commands to avoid chirping conflicts
+  // // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
+  // let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
+  // if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
+  //   play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
+  // }
+  // playAt(play_frame, 'run', INSTRUCTOR_GAIN);
+  playAt(tick.frame + frames.half + frames.quarter - loopbackFrames, 'run', INSTRUCTOR_GAIN);
 }
 
 function instructorPause() {
