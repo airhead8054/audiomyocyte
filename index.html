@@ -1910,7 +1910,7 @@ function monitorClockLoop() {
   }
   // listen for student chirps
   // PITFALL: may only be able to process one student chirp at a time (the lastest)
-  let start = monitorClock.nextTick + frames.quarter + frames.half - frames.before - frames.noise;
+  let start = monitorClock.nextTick - frames.before - frames.noise;
   let length = frames.noise + 2* frames.before + frames.maxDistance + templates.student.length;
   recordAt(start, length, function (samples) {
     if (samples !== null) {
