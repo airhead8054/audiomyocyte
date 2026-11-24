@@ -335,6 +335,11 @@ function computeFrames() {
 // 2. SMALL HELPERS
 // =====================================================================
 
+// booleans for instructor button
+let run_pressed = false;
+let pause_pressed = false;
+let reset_pressed = false;
+
 function log(text) {
   const box = document.getElementById('log');
   const time = new Date().toTimeString().substring(0, 8);
@@ -781,6 +786,14 @@ function bookInstructorChirps() {
     playAt(instructorClock.nextChirpFrame, 'instructor', INSTRUCTOR_GAIN);
     flashAtFrame(instructorClock.nextChirpFrame);
     instructorClock.nextChirpFrame = instructorClock.nextChirpFrame + frames.period;
+
+    // for instructor commands
+    if (run_pressed) {
+      run_pressed = false;
+      let play_time = instructorClock.nextChirpFrame + frames.quarter;
+      playAt(play_time, 'run', INSTRUCTOR_GAIN);
+      log("Playing command \'run\' at " + play_time +'!');
+    }
   }
 }
 
@@ -1955,7 +1968,10 @@ function instructorRun() {
   //   play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
   // }
   // playAt(play_frame, 'run', INSTRUCTOR_GAIN);
-  playAt(tick.frame + frames.half + frames.quarter - loopbackFrames, 'run', INSTRUCTOR_GAIN);
+
+  // instructor chirps at half of period
+  // playAt(instructorClock.nextChirpFrame + frames.quarter, 'run', INSTRUCTOR_GAIN);
+  run_pressed = true;
 }
 
 function instructorPause() {
