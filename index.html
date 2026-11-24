@@ -1308,7 +1308,7 @@ function runTick(tick) {
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.run));
       count = countChirps(samples, templates.run, templates.runCos, frames.noise);
-      if (peak.value >= settings.threshold) log('======RUN!======');
+      command_run_received = peak.value >= settings.threshold;
     }
   });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
