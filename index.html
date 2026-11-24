@@ -161,7 +161,7 @@
 </div>
 
 <!-- ==== MONITOR ==== -->
-<div class="card" id="instructorCard" hidden>
+<div class="card" id="monitorCard" hidden>
   <canvas id="monitorCanvas"></canvas>
   <button id="monitorStartBtn">Reset Monitor</button>
 </div>
@@ -1515,6 +1515,7 @@ async function startInstructor() {
     setInterval(bookInstructorChirps, 250);
     setInterval(updateScreen, 250);
     document.getElementById('instructorCard').hidden = false;
+    document.getElementById('monitorCard').hidden = false;
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsInstructor();
