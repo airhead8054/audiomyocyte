@@ -336,9 +336,8 @@ function computeFrames() {
 // =====================================================================
 
 // booleans for instructor button
-let run_pressed = false;
-let pause_pressed = false;
-let reset_pressed = false;
+
+let instructor_command = '';
 
 function log(text) {
   const box = document.getElementById('log');
@@ -789,14 +788,14 @@ function bookInstructorChirps() {
   }
 
   // for instructor commands
-  if (run_pressed) {
-    run_pressed = false;
+  if (instructor_command !== '') {
     let play_time = instructorClock.nextChirpFrame + frames.quarter;
     while (play_time - msToFrames(1000) > nowFrame()) {
       play_time -= msToFrames(1000);
     }
-    playAt(play_time, 'run', INSTRUCTOR_GAIN);
-    log("Playing command \'run\' at " + play_time +'!');
+    playAt(play_time, instructor_command, INSTRUCTOR_GAIN);
+    log('Playing command \'' + instructor_command + '\' at ' + play_time +'!');
+    instructor_command = '';
   }
 }
 
@@ -834,57 +833,6 @@ function listenForInstructor() {
     length = frames.period + templates.instructor.length;
   }
   recordAt(start, length, onInstructorWindow);
-}
-
-function listenForRun() {
-  const earliest = nowFrame() + msToFrames(20);
-  let start = null;
-  let length = 0;
-  if (start === null || start < earliest) {
-    start = earliest;
-    length = frames.period + msToFrames(20);
-  }
-  recordAt(start, length, function(samples, startFrame) {
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.run));
-      if (peak.value >= settings.threshold) log("=====RUN!=====");
-    }
-    listenForRun();
-  });
-}
-
-function listenForPause() {
-  const earliest = nowFrame() + msToFrames(20);
-  let start = null;
-  let length = 0;
-  if (start === null || start < earliest) {
-    start = earliest;
-    length = frames.period + msToFrames(20);
-  }
-  recordAt(start, length, function(samples, startFrame) {
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.pause));
-      if (peak.value >= settings.threshold) log("=====PAUSE!=====");
-    }
-    listenForPause();
-  });
-}
-
-function listenForReset() {
-  const earliest = nowFrame() + msToFrames(20);
-  let start = null;
-  let length = 0;
-  if (start === null || start < earliest) {
-    start = earliest;
-    length = frames.period + msToFrames(20);
-  }
-  recordAt(start, length, function(samples, startFrame) {
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.reset));
-      if (peak.value >= settings.threshold) log("=====RESET!=====");
-    }
-    listenForReset();
-  });
 }
 
 function onInstructorWindow(samples, startFrame) {
@@ -1336,7 +1284,7 @@ function runTick(tick) {
   let length = frames.noise + 2 * frames.before + frames.radius + templates.student.length;
   // listen for instructor commands too
   let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
-  let command_length = frames.noise + 2* frames.before + frames.maxDistance + templates.run.length;
+  let command_length_incomplete = frames.noise + 2* frames.before + frames.maxDistance;
   if (!tick.reliable) {
     // Not synced: our tick may be up to the room size late, so listen earlier.
     // PITFALL: the longer window also lets in neighbours from farther away.
@@ -1353,16 +1301,28 @@ function runTick(tick) {
     stepCell(count);
     showDetection(count); // EXPERT MODE: big display of what was heard
   });
-  recordAt(command_start, command_length, function (samples) {
+  // instructor commands
+  recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
     let count = 0;
     if (samples !== null) {
-      // const peak = strongestPeak(correlate(samples, templates.run));
-      // if (peak.value >= settings.threshold) log("=====RUN!=====");
       count = countChirps(samples, templates.run, templates.runCos, frames.noise);
     }
     if (count) log("=====RUN!=====");
   });
-  
+  recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      count = countChirps(samples, templates.pause, templates.pauseCos, frames.noise);
+    }
+    if (count) log("=====PAUSE!=====");
+  });
+  recordAt(command_start, command_length_incomplete + templates.reset.length, function (samples) {
+    let count = 0;
+    if (samples !== null) {
+      count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
+    }
+    if (count) log("=====RESET!=====");
+  });
 }
 
 function stepCell(neighbours) {
@@ -1512,9 +1472,6 @@ async function startStudent() {
     } else {
       listenForInstructor();
     }
-    // listenForRun();
-    // listenForPause();
-    // listenForReset();
   } catch (error) {
     log('ERROR: ' + error);
     makeRetryButtonsAsStudent();
@@ -1966,39 +1923,17 @@ function resetCell() {
 
 // ---- functions for instructor buttons ----
 function instructorRun() {
-  // let now_frame = nowFrame();
-  // // time buffer between normal chirps and instructor commands to avoid chirping conflicts
-  // // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
-  // let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
-  // if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
-  //   play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
-  // }
-  // playAt(play_frame, 'run', INSTRUCTOR_GAIN);
-
-  // instructor chirps at half of period
-  // playAt(instructorClock.nextChirpFrame + frames.quarter, 'run', INSTRUCTOR_GAIN);
-  run_pressed = true;
+  // instructor_command must correspond to a template!
+  instructor_command = 'run';
 }
 
 function instructorPause() {
-  let now_frame = nowFrame();
-  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
-  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
-  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
-  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
-    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
-  }
-  playAt(play_frame, 'pause', INSTRUCTOR_GAIN);
+  // instructor_command must correspond to a template!
+  instructor_command = 'pause';
 }
 function instructorReset() {
-  let now_frame = nowFrame();
-  // time buffer between normal chirps and instructor commands to avoid chirping conflicts
-  // (see 1. const INSTRUCTOR_COMMAND_BUFFER)
-  let play_frame = now_frame + INSTRUCTOR_COMMAND_BUFFER;
-  if (instructorClock.nextChirpFrame - play_frame <= INSTRUCTOR_COMMAND_BUFFER) {
-    play_frame = instructorClock.nextChirpFrame + INSTRUCTOR_COMMAND_BUFFER;
-  }
-  playAt(play_frame, 'reset', INSTRUCTOR_GAIN);
+  // instructor_command must correspond to a template!
+  instructor_command = 'reset';
 }
 
 // ---- expert buttons ----
