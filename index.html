@@ -826,7 +826,7 @@ function listenForRun() {
   let length = 0;
   if (start === null || start < earliest) {
     start = earliest;
-    length = frames.period + templates.run.length;
+    length = templates.run.length + 1;
   }
   recordAt(start, length, function(samples, startFrame) {
     if (samples !== null) {
@@ -843,7 +843,7 @@ function listenForPause() {
   let length = 0;
   if (start === null || start < earliest) {
     start = earliest;
-    length = frames.period + templates.pause.length;
+    length = templates.pause.length + 1;
   }
   recordAt(start, length, function(samples, startFrame) {
     if (samples !== null) {
@@ -860,7 +860,7 @@ function listenForReset() {
   let length = 0;
   if (start === null || start < earliest) {
     start = earliest;
-    length = frames.period + templates.reset.length;
+    length = templates.reset.length + 1;
   }
   recordAt(start, length, function(samples, startFrame) {
     if (samples !== null) {
