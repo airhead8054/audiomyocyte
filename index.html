@@ -1305,23 +1305,26 @@ function runTick(tick) {
   recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
     let count = 0;
     if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.run));
       count = countChirps(samples, templates.run, templates.runCos, frames.noise);
+      if (peak.value >= settings.threshold) log ('======RUN!======');
     }
-    if (count) log("=====RUN!=====");
   });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
     let count = 0;
     if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.pause));
       count = countChirps(samples, templates.pause, templates.pauseCos, frames.noise);
+      if (peak.value >= settings.threshold) log ('======PAUSE!======');
     }
-    if (count) log("=====PAUSE!=====");
   });
   recordAt(command_start, command_length_incomplete + templates.reset.length, function (samples) {
     let count = 0;
     if (samples !== null) {
+      const peak = strongestPeak(correlate(samples, templates.reset));
       count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
+      if (peak.value >= settings.threshold) log ('======RESET!======');
     }
-    if (count) log("=====RESET!=====");
   });
 }
 
