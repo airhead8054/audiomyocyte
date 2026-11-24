@@ -1259,6 +1259,7 @@ function runTick(tick) {
   if (loud.role !== '') {
     return; // the loudness test uses the ticks instead of the simulation
   }
+  if (sim.cell === null) return;
   // instructor command audio processing
   if (!tick.reliable) {
     command_start -= frames.maxDistance;
@@ -1298,9 +1299,7 @@ function runTick(tick) {
       if (peak.value >= settings.threshold) log('======RESET!======');
     }
   });
-  if (!sim.running || sim.cell === null) {
-    return;
-  }
+  if (!sim.running) return;
   if (sim.fireNext) {
     sim.fireNext = false;
     // Only a synced phone makes a sound; an unsynced one just flashes.
