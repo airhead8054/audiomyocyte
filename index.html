@@ -163,7 +163,7 @@
 <!-- ==== MONITOR ==== -->
 <div class="card" id="monitorCard" hidden>
   <canvas id="monitorCanvas"></canvas>
-  <button id="monitorStartBtn">Reset Monitor</button>
+  <button id="monitorStartBtn">Start Monitor</button>
 </div>
 
 <h3>Log</h3>
@@ -1896,7 +1896,7 @@ function showDetection(count) {
 // clocks for audio listening
 
 function monitorClockLoop() {
-  const lead = Math.round(frames.period * 0.4);
+  const lead = Math.round(frames.period * 0.2);
   const now = nowFrame();
   if (now < monitorClock.nextTick - lead) {
     return; // not yet
