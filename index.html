@@ -335,9 +335,10 @@ function computeFrames() {
 // 2. SMALL HELPERS
 // =====================================================================
 
-// booleans for instructor button
+// variables for instructor commands
 
 let instructor_command = '';
+let command_run_received = false;
 
 function log(text) {
   const box = document.getElementById('log');
@@ -1333,6 +1334,11 @@ function stepCell(neighbours) {
   sim.pressed = {};
   let result = null;
   try {
+    if (command_run_received) {
+      input.pressed.stimulate = true;
+      log(input.pressed.stimulate);
+      command_run_received = false;
+    }
     result = sim.cell.step(sim.state, input, readCellSettings());
   } catch (error) {
     log('Error in the cell file (step): ' + error.message);
