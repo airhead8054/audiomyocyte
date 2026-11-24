@@ -785,21 +785,18 @@ function bookInstructorChirps() {
   while (instructorClock.nextChirpFrame < bookUntil) {
     playAt(instructorClock.nextChirpFrame, 'instructor', INSTRUCTOR_GAIN);
     flashAtFrame(instructorClock.nextChirpFrame);
-
-    // for instructor commands
-    if (run_pressed) {
-      run_pressed = false;
-      let play_time = instructorClock.nextChirpFrame + frames.quarter;
-      while (play_time - msToFrames(1000) > nowFrame()) {
-        play_time -= msToFrames(1000);
-      }
-      playAt(play_time, 'run', INSTRUCTOR_GAIN);
-      log("Playing command \'run\' at " + play_time +'!');
-    }
-
     instructorClock.nextChirpFrame = instructorClock.nextChirpFrame + frames.period;
+  }
 
-    
+  // for instructor commands
+  if (run_pressed) {
+    run_pressed = false;
+    let play_time = instructorClock.nextChirpFrame + frames.quarter;
+    while (play_time - msToFrames(1000) > nowFrame()) {
+      play_time -= msToFrames(1000);
+    }
+    playAt(play_time, 'run', INSTRUCTOR_GAIN);
+    log("Playing command \'run\' at " + play_time +'!');
   }
 }
 
@@ -1357,10 +1354,13 @@ function runTick(tick) {
     showDetection(count); // EXPERT MODE: big display of what was heard
   });
   recordAt(command_start, command_length, function (samples) {
+    let count = 0;
     if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.run));
-      if (peak.value >= settings.threshold) log("=====RUN!=====");
+      // const peak = strongestPeak(correlate(samples, templates.run));
+      // if (peak.value >= settings.threshold) log("=====RUN!=====");
+      count = countChirps(samples, templates.run, templates.runCos, frames.noise);
     }
+    if (count) log("=====RUN!=====");
   });
   
 }
