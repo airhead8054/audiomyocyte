@@ -198,6 +198,7 @@
 //   11. The simulation and the cell file
 //   12. Screen and buttons
 //   13. Small group / expert mode (new in v2.6)
+//   14. Monitor of student chirps (only activation for now)
 //
 //  EXPERT MODE (v2.6), for about 10 students who know what they are doing.
 //  Turn it on in Settings or with ?expert=1. It adds:
@@ -373,10 +374,13 @@ function wrapToPeriod(n) {
 // =====================================================================
 // 3. CHIRP SHAPES
 // =====================================================================
-// Three different shapes, so a phone always knows what it is hearing:
+// Six different shapes, so a phone always knows what it is hearing:
 //   student:    rising sweep 2.5 -> 5.5 kHz
 //   instructor: falling sweep 5.5 -> 2.5 kHz
 //   sync:       up then down (only used when shaking phones together)
+//   run:        rising sweep 6.0 -> 9.0 kHz
+//   pause:      falling sweep 9.0 -> 6.0 kHz
+//   reset:      rising sweep 9.5 -> 12.5 kHz
 
 // useCosine = true makes the same sweep with cos() instead of sin(): a copy
 // shifted by a quarter of a wave. Used by countChirps (part 4).
@@ -1879,6 +1883,10 @@ function showDetection(count) {
   document.getElementById('detectHistory').textContent =
     'last ticks (F = fired): ' + expert.history.join(' ');
 }
+
+// =====================================================================
+// 14. MONITOR OF STUDENT CHIRPS (only activation for now)
+// =====================================================================
 
 // ---- tuning controls ----
 function showTuningValues() {
