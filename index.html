@@ -1276,7 +1276,7 @@ function runTick(tick) {
       if (peak.value >= settings.threshold) {
         sim.running = true;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
-        log('Simulation is now running.');
+        log('Simulation is now running due to instructor command.');
       }
       
     }
@@ -1289,7 +1289,7 @@ function runTick(tick) {
       if (peak.value >= settings.threshold) {
         sim.running = false;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
-        log('Simulation is now paused.');
+        log('Simulation is now paused due to instructor command.');
       };
     }
   });
@@ -1298,7 +1298,10 @@ function runTick(tick) {
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.reset));
       count = countChirps(samples, templates.reset, templates.resetCos, frames.noise);
-      if (peak.value >= settings.threshold) log('======RESET!======');
+      if (peak.value >= settings.threshold) {
+        resetCell();
+        log('Reset cell due to instructor command.');
+      };
     }
   });
   if (!sim.running) return;
