@@ -1265,7 +1265,7 @@ function runTick(tick) {
   let command_length_incomplete = frames.noise + 2* frames.before + frames.maxDistance;
   if (!tick.reliable) {
     command_start -= frames.maxDistance;
-    command_length += frames.maxDistance;
+    command_length_incomplete += frames.maxDistance;
   }
   // instructor commands
   recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
