@@ -1261,6 +1261,8 @@ function runTick(tick) {
   }
   if (sim.cell === null) return;
   // instructor command audio processing
+  let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
+  let command_length_incomplete = frames.noise + 2* frames.before + frames.maxDistance;
   if (!tick.reliable) {
     command_start -= frames.maxDistance;
     command_length += frames.maxDistance;
@@ -1321,9 +1323,6 @@ function runTick(tick) {
   // NOISE_MS earlier still, to measure the background noise (see countChirps).
   let start = tick.frame - frames.before - frames.noise;
   let length = frames.noise + 2 * frames.before + frames.radius + templates.student.length;
-  // listen for instructor commands too
-  let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
-  let command_length_incomplete = frames.noise + 2* frames.before + frames.maxDistance;
   if (!tick.reliable) {
     // Not synced: our tick may be up to the room size late, so listen earlier.
     // PITFALL: the longer window also lets in neighbours from farther away.
