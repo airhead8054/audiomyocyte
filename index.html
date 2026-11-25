@@ -1280,10 +1280,10 @@ function runTick(tick) {
     command_length_incomplete += frames.maxDistance;
   }
   // instructor commands
+  log("Listening at: " + command_start);
   recordAt(command_start, command_length_incomplete + templates.run.length, function (samples) {
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.run));
-      log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
       if (peak.value >= settings.threshold) {
         sim.running = true;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
@@ -1293,6 +1293,7 @@ function runTick(tick) {
         if (!instructor_passthrough_refractory) {
           let command_passthrough_time = tick.frame + frames.period * 3 + frames.quarter + frames.half;
           playAt(command_passthrough_time, 'run', settings.gain);
+          log("Play at: " + command_passthrough_time);
           instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
         } 
         // pause passthrough to avoid looping
