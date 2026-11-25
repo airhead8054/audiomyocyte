@@ -1287,7 +1287,6 @@ function runTick(tick) {
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
         log('Simulation is now running due to instructor command.');
       }
-      
     }
   });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
