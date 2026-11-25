@@ -856,7 +856,7 @@ function onInstructorWindow(samples, startFrame) {
   let heard = false;
   if (samples !== null) {
     const peak = strongestPeak(correlate(samples, templates.instructor));
-    log("Listening for threshold: " + settings.threshold + "; Peak: " + peak + ".");
+    log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
     if (peak.value >= settings.threshold) {
       arrival = startFrame + peak.index;
       heard = true;
