@@ -344,6 +344,7 @@ function computeFrames() {
 // variables for instructor commands
 
 let instructor_command = '';
+let instructor_passthrough_refractory = 5;
 
 function log(text) {
   const box = document.getElementById('log');
@@ -1286,8 +1287,15 @@ function runTick(tick) {
         sim.running = true;
         document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
         log('Simulation is now running due to instructor command.');
+
+        // carry on the signal in case chirp can't travel far
+        if (!instructor_passthrough_refractory) {
+          let command_passthrough_time = tick.frame + frames.period + frames.quarter + frames.half;
+          playAt(command_passthrough_time, 'run', settings.gain);
+        } 
+        // pause passthrough to avoid looping
+        // (this is turning into a cellular automata in of itself)
       }
-      
     }
   });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
@@ -1309,6 +1317,12 @@ function runTick(tick) {
       };
     }
   });
+  // count down passthrough pause
+  if (instructor_passthrough_refractory > 0) {
+    instructor_passthrough_refractory --;
+  }
+
+
   if (!sim.running) return;
   if (sim.fireNext) {
     sim.fireNext = false;
