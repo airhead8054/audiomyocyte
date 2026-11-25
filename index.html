@@ -1291,7 +1291,7 @@ function runTick(tick) {
 
         // carry on the signal in case chirp can't travel far
         if (!instructor_passthrough_refractory) {
-          let command_passthrough_time = tick.frame + frames.period + frames.quarter + frames.half;
+          let command_passthrough_time = tick.frame + frames.period * 3 + frames.quarter + frames.half;
           playAt(command_passthrough_time, 'run', settings.gain);
           instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
         } 
