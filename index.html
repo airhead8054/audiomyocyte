@@ -1292,6 +1292,7 @@ function runTick(tick) {
         if (!instructor_passthrough_refractory) {
           let command_passthrough_time = tick.frame + frames.period + frames.quarter + frames.half;
           playAt(command_passthrough_time, 'run', settings.gain);
+          instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
         } 
         // pause passthrough to avoid looping
         // (this is turning into a cellular automata in of itself)
