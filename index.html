@@ -333,7 +333,7 @@ function computeFrames() {
   frames.maxDistance = msToFrames(settings.maxRoomM / SPEED_OF_SOUND_M_PER_MS);
   // Window around the expected instructor chirp: wide enough for someone
   // walking across the room while carrying the time.
-  frames.instructorMargin = frames.maxDistance + msToFrames(100);
+  frames.instructorMargin = frames.maxDistance + msToFrames(20);
 }
 
 
