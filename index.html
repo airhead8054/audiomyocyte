@@ -1328,6 +1328,7 @@ function runTick(tick) {
           let command_passthrough_time = tick.frame + frames.period + frames.quarter + frames.half - loopbackFrames;
           playAt(command_passthrough_time, 'reset', settings.gain);
           instructor_passthrough_refractory = Math.ceil(settings.maxRoomM / settings.radiusM + 1); // wait some time before another passthrough
+        } 
         // (this is turning into a cellular automata in of itself)
       }
     }
