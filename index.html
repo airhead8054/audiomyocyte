@@ -1290,7 +1290,7 @@ function runTick(tick) {
 
         // carry on the signal in case chirp can't travel far
         if (!instructor_passthrough_refractory) {
-          let command_passthrough_time = tick.frame + frames.period * 1.9 + frames.quarter + frames.half;
+          let command_passthrough_time = tick.frame + frames.period + frames.quarter + frames.half - loopbackFrames;
           playAt(command_passthrough_time, 'run', settings.gain);
           instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
         } 
@@ -1299,25 +1299,25 @@ function runTick(tick) {
       }
     }
   });
-  recordAt(command_start + frames.period * 0.9, command_length_incomplete + templates.run.length, function (samples) {
-    if (samples !== null) {
-      const peak = strongestPeak(correlate(samples, templates.run));
-      if (peak.value >= settings.threshold) {
-        sim.running = true;
-        document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
-        log('Simulation is now running due to instructor command.');
+  // recordAt(command_start + frames.period * 0.9, command_length_incomplete + templates.run.length, function (samples) {
+  //   if (samples !== null) {
+  //     const peak = strongestPeak(correlate(samples, templates.run));
+  //     if (peak.value >= settings.threshold) {
+  //       sim.running = true;
+  //       document.getElementById('runBtn').textContent = sim.running ? 'Pause simulation' : 'Run simulation';
+  //       log('Simulation is now running due to instructor command.');
 
-        // carry on the signal in case chirp can't travel far
-        if (!instructor_passthrough_refractory) {
-          let command_passthrough_time = tick.frame + frames.period * 1.9 + frames.quarter + frames.half;
-          playAt(command_passthrough_time, 'run', settings.gain);
-          instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
-        } 
-        // pause passthrough to avoid looping
-        // (this is turning into a cellular automata in of itself)
-      }
-    }
-  });
+  //       // carry on the signal in case chirp can't travel far
+  //       if (!instructor_passthrough_refractory) {
+  //         let command_passthrough_time = tick.frame + frames.period * 1.9 + frames.quarter + frames.half;
+  //         playAt(command_passthrough_time, 'run', settings.gain);
+  //         instructor_passthrough_refractory = 30; // wait 30 seconds before another passthrough
+  //       } 
+  //       // pause passthrough to avoid looping
+  //       // (this is turning into a cellular automata in of itself)
+  //     }
+  //   }
+  // });
   recordAt(command_start, command_length_incomplete + templates.pause.length, function (samples) {
     if (samples !== null) {
       const peak = strongestPeak(correlate(samples, templates.pause));
