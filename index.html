@@ -494,6 +494,17 @@ function strongestPeak(corr) {
   return best;
 }
 
+// function to address the pitfall of strongestPeak()
+function strongestPeakEarliest(corr) {
+  let best = { index: -1, value: 0 };
+  for (let i = corr.length - 1; i >= 0; i--) {
+    if (corr[i] > best.value) {
+      best = { index: i, value: corr[i] };
+    }
+  }
+  return best;
+}
+
 // ---- Counting neighbour chirps ----
 // Neighbours' chirps overlap (they are 10 ms long but arrive within about
 // 3 ms of each other), which makes counting them harder than finding one:
@@ -856,7 +867,7 @@ function onInstructorWindow(samples, startFrame) {
   let arrival = null;
   let heard = false;
   if (samples !== null) {
-    const peak = strongestPeak(correlate(samples, templates.instructor));
+    const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
     // if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
     if (peak.value >= settings.threshold) {
       arrival = startFrame + peak.index;
@@ -1271,6 +1282,7 @@ function runTick(tick) {
   if (loud.role !== '') {
     return; // the loudness test uses the ticks instead of the simulation
   }
+  playAt(tick.frame + frames.half - loopbackFrames, 'instructor', settings.gain);
   if (sim.cell === null) return;
   // instructor command audio processing
   let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
