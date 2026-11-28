@@ -863,7 +863,7 @@ function listenForInstructor() {
   if (instructor.lastArrival !== null && instructor.misses < MAX_MISSES) {
     // We know roughly where it will be: listen around there.
     start = instructor.lastArrival + frames.period - frames.instructorMargin;
-    length = 2 * frames.instructorMargin + templates.instructor.length;
+    length = 2 * frames.instructorMargin + templates.instructorSigned.length;
   }
   if (start === null || start < earliest) {
     // We don't know where it is (or we fell behind): listen to a whole period.
@@ -886,7 +886,7 @@ function onInstructorWindow(samples, startFrame) {
     const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
-    if (peak.value >= settings.threshold && peak_signed.value < settings.threshold) {
+    if (peak.value >= settings.threshold && peak.value > peak_signed.value) {
       arrival = startFrame + peak.index;
       heard = true;
     }
