@@ -433,8 +433,8 @@ function makeTemplates() {
   templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
   // make a signed version of chirp
   templates.instructorSigned = templates.instructor;
-  let frames_5ms = msToFrames(5);
-  for (let i = 0; i < frames_5ms; i ++) {
+  let frames_20ms = msToFrames(20);
+  for (let i = 0; i < frames_20ms; i ++) {
     templates.instructorSigned[templates.instructor.length + i] = signature;
   }
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
