@@ -431,12 +431,15 @@ function makeTemplates() {
   templates.student = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate);
   templates.studentCos = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate, true);
   templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
+
   // make a signed version of chirp
-  templates.instructorSigned = templates.instructor;
-  let frames_20ms = msToFrames(20);
-  for (let i = 0; i < frames_20ms; i ++) {
-    templates.instructorSigned[templates.instructor.length + i] = signature;
+  let instructorSigned = templates.instructor;
+  let frames_5ms = msToFrames(5);
+  for (let i = 0; i < frames_5ms; i ++) {
+   instructorSigned[templates.instructor.length + i] = signature;
   }
+  templates.instructorSigned = instructorSigned;
+
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
 
   // instructor commands
