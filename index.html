@@ -890,18 +890,20 @@ function onInstructorWindow(samples, startFrame) {
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
     if (peak.value >= settings.threshold) {
-      if (peak.value > peak_signed.value) {
+      if (peak.value - 0.15 > peak_signed.value) {
         arrival = startFrame + peak.index;
         heard = true;
       } else {
-        let frames_shift = msToFrames(0.5);
+        let frames_shift = msToFrames(1);
         if (frames_shift < extra_frames) {
           shorter_samples = samples.slice(frames_shift, -extra_frames + frames_shift);
-          peak = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
-          if (peak.value > settings.threshold) {
+          let peak_new = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
+          if (peak_new.value > peak.value) {
+            arrival = startFrame + peak_new.index;
+          } else {
             arrival = startFrame + peak.index;
-            heard = true;
           }
+          heard = true;
         } 
       }
     }
