@@ -878,7 +878,7 @@ function onInstructorWindow(samples, startFrame) {
     const peak_signed = strongestPeakEarliest(correlate(samples, templates.instructorSigned));
     const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
-    // if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
+    if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
     if (peak.value >= settings.threshold && peak_signed.value < settings.threshold) {
       arrival = startFrame + peak.index;
       heard = true;
