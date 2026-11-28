@@ -884,16 +884,26 @@ function onInstructorWindow(samples, startFrame) {
   if (samples !== null) {
     const peak_signed = strongestPeakEarliest(correlate(samples, templates.instructorSigned));
     // remove extra samples length
-    let shorter_samples = [];
-    for (let i = 0; i < samples.length - Math.floor(settings.instructorChirpMs / 2); i ++) {
-      shorter_samples[shorter_samples.length] = samples[i];
-    }
-    const peak = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
+    let extra_frames = msToFrames(settings.instructorChirpMs / 2)
+    let shorter_samples = samples.slice(0, -extra_frames);
+    let peak = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
-    if (peak.value >= settings.threshold && peak.value > peak_signed.value) {
-      arrival = startFrame + peak.index;
-      heard = true;
+    if (peak.value >= settings.threshold) {
+      if (peak.value > peak_signed.value) {
+        arrival = startFrame + peak.index;
+        heard = true;
+      } else {
+        let frames_shift = msToFrames(0.5);
+        if (frames_shift < extra_frames) {
+          shorter_samples = samples.slice(frames_shift, -extra_frames + frames_shift);
+          peak = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
+          if (peak.value > settings.threshold) {
+            arrival = startFrame + peak.index;
+            heard = true;
+          }
+        } 
+      }
     }
   }
 
