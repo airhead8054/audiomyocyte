@@ -438,7 +438,7 @@ function makeTemplates() {
   for (let i = 0; i < templates.instructor.length; i ++) {
     instructorSigned[instructorSigned.length] = templates.instructor[i];
   }
-  let frames_sign = msToFrames(settings.instructorChirpMs);
+  let frames_sign = msToFrames(5);
   for (let i = 0; i < frames_sign; i ++) {
     instructorSigned[instructorSigned.length] = signature;
   }
