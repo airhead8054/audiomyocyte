@@ -438,7 +438,7 @@ function makeTemplates() {
   for (let i = 0; i < templates.instructor.length; i ++) {
     instructorSigned[instructorSigned.length] = templates.instructor[i];
   }
-  let frames_sign = msToFrames(5);
+  let frames_sign = msToFrames(Math.floor(settings.instructorChirpMs / 2));
   for (let i = 0; i < frames_sign; i ++) {
     instructorSigned[instructorSigned.length] = signature;
   }
@@ -886,7 +886,7 @@ function onInstructorWindow(samples, startFrame) {
     const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
-    if (peak.value >= settings.threshold && peak.value > peak_signed.value) {
+    if (peak.value >= settings.threshold && peak.value - 0.2 > peak_signed.value) {
       arrival = startFrame + peak.index;
       heard = true;
     }
