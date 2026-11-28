@@ -424,12 +424,19 @@ function makeUpDown(lowHz, highHz, durationMs, sampleRate) {
   return wave;
 }
 
-const templates = { student: null, studentCos: null, instructor: null, sync: null, run: null, pause: null, reset: null };
+const signature = Math.random();
+const templates = { student: null, studentCos: null, instructor: null, instructorSigned: null, sync: null, run: null, pause: null, reset: null };
 
 function makeTemplates() {
   templates.student = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate);
   templates.studentCos = makeSweep(2500, 5500, settings.chirpMs, audio.sampleRate, true);
   templates.instructor = makeSweep(5500, 2500, settings.instructorChirpMs, audio.sampleRate);
+  // make a signed version of chirp
+  templates.instructorSigned = templates.instructor;
+  let frames_5ms = msToFrames(5);
+  for (let i = 0; i < frames_5ms; i ++) {
+    templates.instructorSigned[templates.instructor.length + i] = signature;
+  }
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
 
   // instructor commands
@@ -442,6 +449,7 @@ function makeTemplates() {
 
   sendWaveform('student', templates.student);
   sendWaveform('instructor', templates.instructor);
+  sendWaveform('instructorSigned', templates.instructorSigned);
   sendWaveform('sync', templates.sync);
   sendWaveform('run', templates.run);
   sendWaveform('pause', templates.pause);
@@ -867,9 +875,11 @@ function onInstructorWindow(samples, startFrame) {
   let arrival = null;
   let heard = false;
   if (samples !== null) {
+    const peak_signed = strongestPeakEarliest(correlate(samples, templates.instructorSigned));
     const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
+    if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     // if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
-    if (peak.value >= settings.threshold) {
+    if (peak.value >= settings.threshold && peak_signed.value < settings.threshold) {
       arrival = startFrame + peak.index;
       heard = true;
     }
@@ -1283,7 +1293,7 @@ function runTick(tick) {
     return; // the loudness test uses the ticks instead of the simulation
   }
   // make sure that the phone does not sync with itself
-  if (sync.state === 'synced') playAt(tick.frame + frames.half - loopbackFrames, 'instructor', settings.gain);
+  if (sync.state === 'synced') playAt(tick.frame + frames.half - loopbackFrames, 'instructorSigned', settings.gain);
   if (sim.cell === null) return;
   // instructor command audio processing
   let command_start = tick.frame + frames.quarter + frames.half - frames.before - frames.noise;
