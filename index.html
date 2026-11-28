@@ -861,7 +861,7 @@ function listenForInstructor() {
   if (start === null || start < earliest) {
     // We don't know where it is (or we fell behind): listen to a whole period.
     start = earliest;
-    length = frames.period + templates.instructor.length;
+    length = frames.period + templates.instructorSigned.length;
   }
   recordAt(start, length, onInstructorWindow);
 }
