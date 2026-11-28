@@ -883,10 +883,15 @@ function onInstructorWindow(samples, startFrame) {
   let heard = false;
   if (samples !== null) {
     const peak_signed = strongestPeakEarliest(correlate(samples, templates.instructorSigned));
-    const peak = strongestPeakEarliest(correlate(samples, templates.instructor));
+    // remove extra samples length
+    let shorter_samples = [];
+    for (let i = 0; i < samples.length - Math.floor(settings.instructorChirpMs / 2); i ++) {
+      shorter_samples[shorter_samples.length] = samples[i];
+    }
+    const peak = strongestPeakEarliest(correlate(shorter_samples, templates.instructor));
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Signed Peak: " + peak_signed.value + ".");
     if (settings.expert) log("Listening for threshold: " + settings.threshold + "; Peak: " + peak.value + ".");
-    if (peak.value >= settings.threshold && peak.value - 0.1 > peak_signed.value) {
+    if (peak.value >= settings.threshold && peak.value > peak_signed.value) {
       arrival = startFrame + peak.index;
       heard = true;
     }
