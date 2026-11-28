@@ -443,6 +443,7 @@ function makeTemplates() {
     instructorSigned[instructorSigned.length] = signature;
   }
   templates.instructorSigned = instructorSigned;
+  console.log(instructorSigned.length);
 
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
 
