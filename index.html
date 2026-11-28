@@ -438,12 +438,11 @@ function makeTemplates() {
   for (let i = 0; i < templates.instructor.length; i ++) {
     instructorSigned[instructorSigned.length] = templates.instructor[i];
   }
-  let frames_5ms = msToFrames(5);
-  for (let i = 0; i < frames_5ms; i ++) {
+  let frames_sign = msToFrames(settings.chirpMs);
+  for (let i = 0; i < frames_sign; i ++) {
     instructorSigned[instructorSigned.length] = signature;
   }
   templates.instructorSigned = instructorSigned;
-  console.log(instructorSigned.length);
 
   templates.sync = makeUpDown(2500, 5500, 20, audio.sampleRate);
 
